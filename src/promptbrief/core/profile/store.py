@@ -111,15 +111,43 @@ def load_profile(name: str, directory: Path | None = None) -> Profile:
     if not isinstance(raw_slots, list) or not isinstance(raw_sources, list):
         raise ProfileCorrupt(f"En el perfil '{name}', 'slots' y 'sources' deben ser listas.")
 
+    # Cada elemento tiene que ser un mapeo antes de indexarlo: sin esto, un slot que
+    # es solo un string ("- solo_una_cadena") pasa el chequeo de lista de arriba y
+    # después _slot_from_dict revienta con un AttributeError sin capturar.
+    for index, item in enumerate(raw_slots):
+        if not isinstance(item, dict):
+            raise ProfileCorrupt(
+                f"En el perfil '{name}', el slot en la posición {index} no es un mapeo."
+            )
+    for index, item in enumerate(raw_sources):
+        if not isinstance(item, dict):
+            raise ProfileCorrupt(
+                f"En el perfil '{name}', el source en la posición {index} no es un mapeo."
+            )
+
+    budget_tokens = data.get("budget_tokens", 1500)
+    # `Profile` es un dataclass sin validación en runtime: sin este chequeo, un
+    # budget_tokens deforme entra tal cual y recién explota lejos de acá, el día que
+    # alguien haga aritmética con el campo.
+    if (
+        not isinstance(budget_tokens, int)
+        or isinstance(budget_tokens, bool)
+        or budget_tokens <= 0
+    ):
+        raise ProfileCorrupt(
+            f"En el perfil '{name}', 'budget_tokens' debe ser un entero positivo, "
+            f"no {budget_tokens!r}."
+        )
+
     try:
         return Profile(
             name=data["name"],
             root=data["root"],
             slots=tuple(_slot_from_dict(slot) for slot in raw_slots),
             sources=tuple(SourceFile(path=s["path"], sha256=s["sha256"]) for s in raw_sources),
-            budget_tokens=data.get("budget_tokens", 1500),
+            budget_tokens=budget_tokens,
         )
-    except (KeyError, TypeError, ValueError) as error:
+    except (KeyError, TypeError, ValueError, AttributeError) as error:
         raise ProfileCorrupt(f"El perfil '{name}' tiene un campo inválido: {error}") from error
 
 

@@ -71,6 +71,14 @@ def test_a_hand_written_minimal_profile_loads(tmp_path):
         "name: x\nroot: /tmp\nslots:\n  - id: a\n    kind: banana\n    content: c\n",
         "name: x\nroot: /tmp\nslots:\n  - kind: convention\n",
         "root: /tmp\n",
+        "name: x\nroot: /tmp\nslots:\n  - solo_una_cadena\n",
+        "name: x\nroot: /tmp\nsources:\n  - path: CLAUDE.md\n",
+        "name: x\nroot: /tmp\nsources:\n  - solo_una_cadena\n",
+        "name: x\nroot: /tmp\nslots:\n"
+        "  - id: a\n    kind: convention\n    content: c\n    applies_to:\n      - not_a_task\n",
+        "name: x\nroot: /tmp\nbudget_tokens: not_a_number\n",
+        "name: x\nroot: /tmp\nbudget_tokens: -5\n",
+        "name: x\nroot: /tmp\nbudget_tokens: 0\n",
     ],
 )
 def test_a_malformed_profile_raises_profile_corrupt_not_a_traceback(tmp_path, body):
