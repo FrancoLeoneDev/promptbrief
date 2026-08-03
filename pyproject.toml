@@ -1,0 +1,32 @@
+[project]
+name = "promptbrief"
+version = "0.1.0"
+description = "Turns informal descriptions into structured briefs for coding agents"
+requires-python = ">=3.11"
+dependencies = ["pyyaml>=6.0", "typer>=0.12"]
+
+[project.scripts]
+pbrief = "promptbrief.cli:app"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["promptbrief"]
+
+[tool.ruff.lint.per-file-ignores]
+# Typer declara las opciones como llamadas en los defaults: es su API, no un descuido.
+"src/promptbrief/cli.py" = ["B008"]
