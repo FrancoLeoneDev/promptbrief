@@ -30,19 +30,36 @@ def read_source(path: Path) -> str | None:
     Devolver None en lugar de propagar la excepción también es deliberado: un archivo
     ilegible no puede abortar el scan de todo el proyecto.
     """
+    # Guarda deliberadamente redundante con discover_sources: esta función tiene que
+    # valer sola, porque un caller futuro (un endpoint HTTP, un handler de otra tarea)
+    # puede llamarla directo con un path que viene de afuera sin pasar por discover_sources.
+    if path.is_symlink():
+        return None
     with path.open("rb") as handle:
         data = handle.read(MAX_SOURCE_BYTES + 1)
     if len(data) > MAX_SOURCE_BYTES:
         return None
     try:
-        # utf-8-sig descarta el BOM que dejan Notepad y otras herramientas de Windows.
         return data.decode("utf-8-sig")
     except UnicodeDecodeError:
+        # Un archivo ilegible no puede abortar el scan de todo el proyecto.
         return None
 
 
 def hash_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """Hashea el archivo completo, en chunks para no cargarlo entero en memoria.
+
+    stale_sources necesita el hash del archivo completo, no de un prefijo: si se
+    cortara la lectura en MAX_SOURCE_BYTES, un cambio más allá de ese punto nunca
+    se detectaría y la detección de desactualización quedaría rota en silencio.
+    Por eso acá no hay tope de tamaño, solo un tope de memoria por chunk.
+    """
+    digest = hashlib.sha256()
+    chunk_size = 64 * 1024
+    with path.open("rb") as handle:
+        while chunk := handle.read(chunk_size):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def stale_sources(profile: Profile, root: Path) -> list[str]:
