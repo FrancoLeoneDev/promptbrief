@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
 
 from promptbrief.core.models import Profile, Provenance, Slot, SlotKind, SourceFile, TaskType
@@ -103,17 +104,32 @@ def distill_markdown(text: str, path: str) -> list[Slot]:
     Lo que no se puede clasificar se marca `needs_review`, y eso implica que no
     se inyecta.
     """
+    lines = text.splitlines()
+
+    # Un fence sin cerrar dejaría `in_code_fence` en True hasta EOF: el resto del
+    # documento se descartaría en silencio, sin señal para el usuario, que solo
+    # vería un perfil más chico. Por eso contamos los fences ANTES de parsear. Un
+    # conteo impar significa que algo quedó sin cerrar, y ahí apagamos el tracking
+    # de fences entero (nada se pierde) pero marcamos TODOS los slots del archivo
+    # `needs_review=True`: perder contenido en silencio es el peor resultado
+    # posible, e inyectar el contenido de un posible bloque de código como si
+    # fuera un hecho del proyecto es el segundo peor. `needs_review=True` evita
+    # los dos — esos slots no se inyectan, pero sí cuentan en `pbrief scan`, así
+    # que el usuario ve que algo quedó sin clasificar y va a mirar el archivo.
+    unclosed_fence = sum(1 for line in lines if _FENCE.match(line)) % 2 == 1
+
     slots: list[Slot] = []
     heading_kind = SlotKind.UNCLASSIFIED
     heading_applies: tuple[TaskType, ...] = ()
     in_code_fence = False
 
-    for lineno, line in enumerate(text.splitlines(), start=1):
-        if _FENCE.match(line):
-            in_code_fence = not in_code_fence
-            continue
-        if in_code_fence:
-            continue
+    for lineno, line in enumerate(lines, start=1):
+        if not unclosed_fence:
+            if _FENCE.match(line):
+                in_code_fence = not in_code_fence
+                continue
+            if in_code_fence:
+                continue
 
         heading = _HEADING.match(line)
         if heading:
@@ -128,6 +144,13 @@ def distill_markdown(text: str, path: str) -> list[Slot]:
             break
 
         content = bullet.group(1).strip()
+        # Una regla horizontal tipo "* * *" matchea _BULLET (`[-*]\s+` no exige que
+        # lo que sigue sea texto) y no aporta ningún hecho del proyecto. "---" no
+        # se ve afectado: sin espacio después del primer "-", ni siquiera matchea
+        # _BULLET.
+        if not content.strip("-*. "):
+            continue
+
         kind, applies = heading_kind, heading_applies
 
         positive = _to_positive(content)
@@ -146,6 +169,9 @@ def distill_markdown(text: str, path: str) -> list[Slot]:
                 redacted=redacted,
             )
         )
+
+    if unclosed_fence:
+        slots = [replace(slot, needs_review=True) for slot in slots]
     return slots
 
 

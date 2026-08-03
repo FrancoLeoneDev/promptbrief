@@ -97,6 +97,33 @@ def test_a_source_with_too_many_bullets_is_truncated():
     assert len(distill_markdown(text, "CLAUDE.md")) == MAX_SLOTS_PER_SOURCE
 
 
+def test_an_unclosed_fence_does_not_swallow_the_rest_of_the_document():
+    # El fence de "```bash" nunca cierra. Sin el conteo previo de fences, todo lo
+    # que viene después (incluida "## Prohibido" y su bullet) se perdería en
+    # silencio: solo saldría "regla uno".
+    text = (
+        "## Convenciones\n"
+        "\n"
+        "- regla uno\n"
+        "\n"
+        "```bash\n"
+        "- regla dos\n"
+        "\n"
+        "## Prohibido\n"
+        "\n"
+        "- regla tres\n"
+    )
+    slots = distill_markdown(text, "CLAUDE.md")
+    assert len(slots) == 3
+    assert all(slot.needs_review for slot in slots)
+
+
+def test_a_horizontal_rule_bullet_is_not_a_slot():
+    slots = distill_markdown("## Convenciones\n\n* * *\n- regla real\n", "CLAUDE.md")
+    assert len(slots) == 1
+    assert slots[0].content == "regla real"
+
+
 def test_package_json_yields_a_stack_slot_for_every_task_type():
     payload = json.dumps({"dependencies": {"next": "15.0.0", "react": "19.0.0"}})
     slots = distill_package_json(payload, "package.json")
