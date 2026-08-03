@@ -139,6 +139,11 @@ def load_profile(name: str, directory: Path | None = None) -> Profile:
             f"no {budget_tokens!r}."
         )
 
+    # AttributeError deliberadamente no está en este tuple: los guards de arriba ya
+    # garantizan que todo elemento de slots/sources es un dict antes de llegar acá, así
+    # que ningún YAML malformado puede producir un AttributeError dentro del try. Si uno
+    # aparece, es un typo de programador (p. ej. data.content en vez de data["content"])
+    # y tiene que reventar como 500, no disfrazarse de error de input del usuario.
     try:
         return Profile(
             name=data["name"],
@@ -147,7 +152,7 @@ def load_profile(name: str, directory: Path | None = None) -> Profile:
             sources=tuple(SourceFile(path=s["path"], sha256=s["sha256"]) for s in raw_sources),
             budget_tokens=budget_tokens,
         )
-    except (KeyError, TypeError, ValueError, AttributeError) as error:
+    except (KeyError, TypeError, ValueError) as error:
         raise ProfileCorrupt(f"El perfil '{name}' tiene un campo inválido: {error}") from error
 
 
