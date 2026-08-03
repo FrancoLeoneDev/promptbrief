@@ -110,3 +110,42 @@ def test_examples_are_wrapped_individually():
 def test_xml_special_characters_in_the_task_are_escaped():
     out = render_brief(BriefRequest(text="fix a < b && c > d", task_type=TaskType.CODE_CHANGE), [])
     assert "&lt;" in out and "&amp;" in out
+
+
+def test_blank_examples_are_dropped_not_emitted_as_empty_tags():
+    request = BriefRequest(
+        text="write a post",
+        task_type=TaskType.WRITING,
+        examples=("first sample", "", "   ", "second sample"),
+    )
+    out = render_brief(request, [])
+    assert out.count("<example>") == 2
+    assert "first sample" in out and "second sample" in out
+
+
+def test_all_blank_examples_omit_the_examples_section_entirely():
+    request = BriefRequest(
+        text="write a post",
+        task_type=TaskType.WRITING,
+        examples=("", "   "),
+    )
+    assert "<examples>" not in render_brief(request, [])
+
+
+def test_blank_constraint_items_leave_no_empty_line_in_the_section():
+    slots = [make_slot("c", "   ", kind=SlotKind.CONSTRAINT)]
+    out = render_brief(full_request(constraints=("a", "", "  ", "b")), slots)
+    constraints_block = out[out.index("<constraints>") : out.index("</constraints>")]
+    assert "\n\n" not in constraints_block
+    assert "a" in constraints_block and "b" in constraints_block
+
+
+def test_blank_file_scope_entries_leave_no_empty_line_in_relevant_paths():
+    request = full_request(file_scope=("a.ts", "", "   ", "b.ts"))
+    out = render_brief(request, [])
+    lines = out.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.strip() == "<relevant_paths>")
+    end = next(i for i, line in enumerate(lines) if line.strip() == "</relevant_paths>")
+    inner_lines = lines[start + 1 : end]
+    assert all(line.strip() for line in inner_lines)
+    assert "a.ts" in out and "b.ts" in out

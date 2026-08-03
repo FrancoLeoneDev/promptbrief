@@ -25,13 +25,14 @@ def _slot_element(slot: Slot) -> str:
 
 
 def _project_context(slots: Sequence[Slot], paths: Sequence[str]) -> str:
-    if not slots and not paths:
+    clean_paths = [path.strip() for path in paths if path.strip()]
+    if not slots and not clean_paths:
         return ""
     lines = ["<project_context>"]
     lines.extend(_slot_element(slot) for slot in slots)
-    if paths:
+    if clean_paths:
         lines.append(f"{_INDENT}<relevant_paths>")
-        lines.extend(f"{_INDENT * 2}{escape(path)}" for path in paths)
+        lines.extend(f"{_INDENT * 2}{escape(path)}" for path in clean_paths)
         lines.append(f"{_INDENT}</relevant_paths>")
     lines.append("</project_context>")
     return "\n".join(lines)
@@ -44,11 +45,11 @@ def _section(tag: str, body: str) -> str:
 
 
 def _examples(examples: Sequence[str]) -> str:
-    if not examples:
+    clean = [text.strip() for text in examples if text.strip()]
+    if not clean:
         return ""
     blocks = [
-        f"{_INDENT}<example>\n{_indent(escape(text.strip()), 2)}\n{_INDENT}</example>"
-        for text in examples
+        f"{_INDENT}<example>\n{_indent(escape(text), 2)}\n{_INDENT}</example>" for text in clean
     ]
     return "<examples>\n" + "\n".join(blocks) + "\n</examples>"
 
@@ -61,10 +62,13 @@ def render_brief(request: BriefRequest, selected: Sequence[Slot]) -> str:
     """
     context_slots = [slot for slot in selected if slot.kind is not SlotKind.CONSTRAINT]
     inherited = [slot.content for slot in selected if slot.kind is SlotKind.CONSTRAINT]
+    constraint_items = [
+        item.strip() for item in [*inherited, *request.constraints] if item.strip()
+    ]
 
     sections = [
         _project_context(context_slots, request.file_scope),
-        _section("constraints", "\n".join([*inherited, *request.constraints])),
+        _section("constraints", "\n".join(constraint_items)),
         _examples(request.examples),
         _section("reproduction", request.repro_steps or ""),
         _section("expected_vs_actual", request.expected_vs_actual or ""),
