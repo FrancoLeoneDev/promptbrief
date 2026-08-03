@@ -56,16 +56,26 @@ def test_multiple_unrelated_tasks_fires_on_an_enumeration():
     )
 
 
-def test_multiple_unrelated_tasks_silent_on_a_single_semicolon():
-    # Un punto y coma no es un marcador de enumeración: un snippet de código
-    # ("const x = 1; const y = 2") no puede disparar la regla.
+def test_multiple_unrelated_tasks_silent_on_multiple_semicolons_in_a_code_snippet():
+    # Un punto y coma no es un marcador de enumeración, ni siquiera repetido: un
+    # snippet de código pegado en el pedido no puede disparar la regla. Guard real
+    # contra el riesgo que el comentario de _TASK_SEPARATOR dice estar evitando
+    # (que alguien agregue ";" a la lista de marcadores).
     assert "multiple_unrelated_tasks" not in text_findings(
-        "agregar la seccion; seguir el patron existente"
+        "agregar const x = 1; const y = 2; const z = 3 al helper de formato"
     )
 
 
 def test_over_emphasis_fires_on_shouting():
     assert "over_emphasis" in text_findings("ES MUY IMPORTANTE que uses TypeScript SIEMPRE")
+
+
+def test_over_emphasis_fires_on_shouted_word_count_alone():
+    # Ningún token de este texto está en _EMPHASIS_WORD: el disparo pasa
+    # exclusivamente por el conteo de _SHOUTED_WORD (MODAL, WIDGET) alcanzando
+    # _MIN_SHOUTED_WORDS. Distingue este camino del de test_over_emphasis_fires_on_shouting,
+    # que dispara por _EMPHASIS_WORD.
+    assert "over_emphasis" in text_findings("revisar el MODAL y el WIDGET de configuracion")
 
 
 def test_over_emphasis_silent_on_technical_acronyms():
