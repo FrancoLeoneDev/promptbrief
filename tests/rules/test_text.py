@@ -1,3 +1,5 @@
+import pytest
+
 from promptbrief.core.models import Severity
 from promptbrief.core.rules.text import TEXT_RULES
 
@@ -56,14 +58,22 @@ def test_multiple_unrelated_tasks_fires_on_an_enumeration():
     )
 
 
-def test_multiple_unrelated_tasks_silent_on_multiple_semicolons_in_a_code_snippet():
-    # Un punto y coma no es un marcador de enumeración, ni siquiera repetido: un
-    # snippet de código pegado en el pedido no puede disparar la regla. Guard real
-    # contra el riesgo que el comentario de _TASK_SEPARATOR dice estar evitando
-    # (que alguien agregue ";" a la lista de marcadores).
-    assert "multiple_unrelated_tasks" not in text_findings(
-        "agregar const x = 1; const y = 2; const z = 3 al helper de formato"
-    )
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Un snippet de código: los ";" no son un marcador de enumeración.
+        "agregar const x = 1; const y = 2; const z = 3 al helper de formato",
+        # Una enumeración con comas, sin ninguno de los marcadores explícitos.
+        "agregar la seccion, el favicon, el readme",
+        # Una "y" suelta, sin "ademas"/"tambien" a continuación.
+        "agregar la seccion y seguir el patron",
+    ],
+)
+def test_multiple_unrelated_tasks_silent_without_an_explicit_separator(text: str):
+    # Contrato de la regla: solo cuentan los marcadores explícitos de _TASK_SEPARATOR
+    # ("y ademas", "y tambien", "and also"). Ni la puntuación (";", ",") ni una "y"
+    # de conjunción común alcanzan, por más que aparezcan varias veces.
+    assert "multiple_unrelated_tasks" not in text_findings(text)
 
 
 def test_over_emphasis_fires_on_shouting():
