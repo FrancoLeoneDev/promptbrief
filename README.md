@@ -66,6 +66,10 @@ A handful of individual rules trace to a specific finding too, and each one says
 - **The brief carries paths, not pasted content.** `<relevant_paths>` lists file paths the agent should look at; it never inlines their contents. This matches the *just-in-time* context strategy Anthropic documents: keep identifiers lightweight and let the agent load what it actually needs, instead of spending the attention budget on content that might not even be relevant to the specific change.
 - **The context budget reports what was left out, and why.** A slot can be excluded for two different reasons, and mixing them up produces a useless signal: `not_applicable` (the slot doesn't apply to this task type — normal, expected, not a finding) and `over_budget` (an applicable slot didn't fit — a real problem, reported as `budget_exceeded`). Only the second one is worth flagging.
 
+## Known limitations
+
+- **Nested bullets are flattened.** Every `-`/`*` line is distilled as an independent fact, so a child bullet loses its parent's context: under a `- Testing:` heading-as-bullet, a nested `- never mock the database` becomes a standalone constraint with no trace of what it qualified. This is v1 being deliberately conservative rather than a bug — inferring a parent-child relationship from indentation means injecting a claim the file never made, and every slot carries a `file:line` you can check. Facts that read oddly out of context can be edited or removed in the profile's YAML by hand.
+
 ## Security
 
 These guards live in `promptbrief.core`, not in the CLI — so they hold even when something other than the CLI calls into the library (a future HTTP server, for instance) and can't be bypassed by skipping a layer above it.
@@ -77,15 +81,14 @@ These guards live in `promptbrief.core`, not in the CLI — so they hold even wh
 
 ## Installation
 
-Requires Python 3.11+.
+Requires Python 3.11+. From a local clone of the repository:
 
 ```bash
-git clone https://github.com/<your-username>/promptbrief.git
 cd promptbrief
-pip install -e .
+pip install -e ".[dev]"
 ```
 
-This installs the `pbrief` command via the project's console-script entry point.
+This installs the `pbrief` command via the project's console-script entry point. The `dev` extra adds `pytest` and `ruff`, which [Running the tests](#running-the-tests) needs; `pip install -e .` alone gives you a working CLI but not those two.
 
 ## Commands
 
@@ -109,9 +112,11 @@ PersonalPage
 portfolio-demo
 ```
 
-### `pbrief lint TEXT [--success ...] [--format ...] [--file ...]`
+### `pbrief lint TEXT [OPTIONS]`
 
 Runs the rule set against a task description without generating a brief. Exits non-zero if any finding is an error.
+
+`lint` and `brief` take the same options, so anything that lints clean builds a brief with no errors under it: `--profile NAME`, `--success`, `--format`, `--file`, `--repro`, `--expected`, `--constraint` and `--example`. The last three are repeatable — one flag per file, constraint or example. Which ones a request needs depends on the task type the classifier picks: a debug task *errors* without `--repro` and `--expected`, a writing task warns without `--example`, and a code change warns without `--constraint` unless the profile supplies one. The rules read those fields, not the prose, so a description that narrates the reproduction steps inside `TEXT` still counts as missing them.
 
 ```bash
 $ pbrief lint "arreglalo"
@@ -129,7 +134,7 @@ $ pbrief lint "arreglalo"
 
 Findings and suggestions are in Spanish — that's the CLI's interface language, chosen because it's the author's daily-use language. The brief's own structural tags (`<task>`, `<constraints>`, …) stay English and stable regardless; only the content passed through from the user and the project's own files keeps its original language, unforced.
 
-### `pbrief brief TEXT [--profile NAME] [--success ...] [--format ...] [--file ...]`
+### `pbrief brief TEXT [OPTIONS]`
 
 Generates the full XML brief — with project context selected from the named profile when one is given — and prints the findings from the rule set below it. `<project_context>` and `<constraints>` are the same as in the [top example](#promptbrief); this run just omits `--format`, so `missing_output_format` fires as a warning:
 
