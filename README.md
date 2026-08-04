@@ -90,6 +90,8 @@ pip install -e ".[dev]"
 
 This installs the `pbrief` command via the project's console-script entry point. The `dev` extra adds `pytest` and `ruff`, which [Running the tests](#running-the-tests) needs; `pip install -e .` alone gives you a working CLI but not those two.
 
+The web front is optional and separate — Node 24+, `cd web && npm install && npm run build`. Everything below works without it; see [The web front](#the-web-front).
+
 ## Commands
 
 ### `pbrief scan [PATH] [--name NAME] [--force]`
@@ -184,6 +186,25 @@ Abrí esta URL, que lleva el token de la sesión:
 **Why there is no `--host`.** The server exposes the machine's filesystem, narrowed to whatever `--allow` lists; binding it to another interface isn't a configurable default, it's a different product with a different threat model. Beyond binding, requests are rejected unless the `Host` header is `127.0.0.1`/`localhost` on the serving port — that's what stops DNS rebinding, where an attacker's domain resolves to `127.0.0.1` so the request is same-origin, carries no `Origin`, and would otherwise look local. `Sec-Fetch-Site` and `Origin` are checked on top of that, and bodies are capped at 1 MB counting bytes as they arrive, since a `Transfer-Encoding: chunked` request has no `Content-Length` to trust.
 
 Every path that reaches the disk — the `root` of a scan, the `root` of a profile the client saves, the `root` a sync re-distills, and the one `brief`/`lint` hash to detect a stale profile — is checked against the `--allow` list on each request, not just the first time it's seen. A profile saved with `root: "C:/"` is rejected at 403 when saved *and* when used, because a stored value is not more trustworthy for having been stored.
+
+## The web front
+
+Three screens over that API, in `web/`: the profile list, a profile editor that shows where every distilled fact came from, and the generator. Angular with standalone components and signals — no NgModules — and hand-written CSS, no UI framework.
+
+```bash
+cd web
+npm install
+npm run build   # writes web/dist/promptbrief-web/browser
+npm test        # 23 unit tests, vitest on jsdom
+```
+
+`pbrief serve` serves that build itself, so there's one process and one origin: no dev server, no proxy, no CORS. If the build isn't there, `/` answers a page that says how to produce it instead of a 500 — the API keeps working either way, since the front is optional and the CLI never needed it.
+
+**How the token reaches the browser.** A browser can't attach a custom header to the URL you paste into it, so the initial document — and only the document — accepts the token as `?token=…`. The front reads it from `location.search`, drops it from the address bar with `history.replaceState` so it doesn't survive in history, keeps it in memory, and from then on an `HttpInterceptor` sends it as `X-PromptBrief-Token` on every call. It attaches the header only to relative `/api/` URLs: the front never calls anywhere else, and that condition is the one thing standing between the token and another origin.
+
+The API itself still refuses the query parameter — a token there ends up in access logs and in history — and that refusal is what makes the whole thing CSRF-proof by construction: a custom header can't be sent cross-origin without a preflight, and the preflight eats a 401 because no CORS is installed. The build's own bundles are served without a token, deliberately: they carry no authority, and the document physically cannot hang a query parameter off the `<script>` tags it emits. Reloading the page after the token is stripped gives a 401 that says to reopen the URL `pbrief serve` printed, which is the honest answer — the token lives as long as that process and no longer.
+
+**The questionnaire builds itself.** The generator doesn't know the 17 rules exist. It posts the loose text to `/api/lint`, and every finding that names a `slot_name` becomes a field, labelled with the finding's own `message` and `suggestion`; findings with a `null` slot are defects of the text, so they render as remarks with nothing to fill in. The answers go back into `/api/brief` keyed by that same `slot_name`, which is a field of the request body — so a new rule in the backend ships its own field with no change here, and there is no `rule_id`-to-field table anywhere in the front to drift out of sync.
 
 ## Running the tests
 
