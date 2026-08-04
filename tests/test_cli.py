@@ -4,6 +4,7 @@ from pathlib import Path
 
 import uvicorn
 from fastapi.testclient import TestClient
+from typer.main import get_command
 from typer.testing import CliRunner
 
 from promptbrief.cli import app
@@ -378,8 +379,13 @@ def test_the_browser_opens_with_the_token_unless_it_is_disabled(monkeypatch, tmp
 def test_serve_has_no_host_flag():
     # Escuchar en otra interfaz no es un default configurable: el servidor expone el
     # disco de la máquina acotado a --allow.
-    result = runner.invoke(app, ["serve", "--help"])
-    assert result.exit_code == 0
-    assert "--host" not in result.stdout
-    assert "--port" in result.stdout
-    assert "--allow" in result.stdout
+    #
+    # Se inspeccionan los parámetros y no la salida de --help: Typer la formatea con
+    # códigos ANSI cuando la terminal soporta color, y ahí "--port" viaja partido en
+    # dos secuencias de escape. Un grep sobre ese texto pasa en una máquina y falla en
+    # el runner de CI, que es exactamente lo que pasó.
+    serve = get_command(app).commands["serve"]
+    flags = {flag for parameter in serve.params for flag in parameter.opts}
+
+    assert "--host" not in flags
+    assert {"--port", "--allow", "--no-browser"} <= flags
