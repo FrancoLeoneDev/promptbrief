@@ -1,0 +1,23 @@
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" routerLink="/profiles">
+      <span class="brand-mark">PB</span>
+      <span class="brand-name">PromptBrief</span>
+    </a>
+    <nav class="tabs">
+      <a routerLink="/profiles" routerLinkActive="on">Perfiles</a>
+      <a routerLink="/generate" routerLinkActive="on">Generador</a>
+    </nav>
+  </div>
+</header>
+
+@if (!session.present()) {
+  <p class="session-warning" role="alert">
+    Esta pestaña no tiene el token de la sesión, así que la API va a rechazar todo con un 401. Abrí
+    la URL que imprimió <code>pbrief serve</code>: el token vive ahí y dura lo que dura ese proceso.
+  </p>
+}
+
+<main class="page">
+  <router-outlet />
+</main>

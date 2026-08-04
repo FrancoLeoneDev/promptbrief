@@ -1,0 +1,127 @@
+<div class="stack">
+  <section>
+    <h1>Perfiles</h1>
+    <p class="lead">
+      Un perfil es lo que quedó del CLAUDE.md de un proyecto después de destilarlo: datos sueltos,
+      cada uno con la línea de la que salió.
+    </p>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">
+      <h2>Escanear un proyecto</h2>
+      <span class="hint"
+        >El servidor solo lee adentro de los directorios que le pasaste con --allow</span
+      >
+    </div>
+
+    <form class="scan-form" (submit)="scan($event)">
+      <div class="field wide">
+        <label for="root">Ruta del proyecto</label>
+        <input
+          id="root"
+          type="text"
+          class="mono"
+          placeholder="C:\proyectos\mi-repo"
+          [value]="root()"
+          (input)="root.set(textOf($event))"
+        />
+      </div>
+
+      <div class="field">
+        <label for="name">Nombre del perfil</label>
+        <input
+          id="name"
+          type="text"
+          placeholder="el de la carpeta"
+          [value]="name()"
+          (input)="name.set(textOf($event))"
+        />
+      </div>
+
+      <div class="field actions">
+        <label class="check">
+          <input type="checkbox" [checked]="force()" (change)="force.set(checkedOf($event))" />
+          Sobrescribir si ya existe
+        </label>
+        <button class="primary" type="submit" [disabled]="scanning.pending() || !root().trim()">
+          {{ scanning.pending() ? 'Escaneando...' : 'Escanear' }}
+        </button>
+      </div>
+    </form>
+
+    @if (force()) {
+      <p class="hint push">
+        Sobrescribir descarta las ediciones que hayas hecho sobre los datos de ese perfil.
+      </p>
+    }
+    @if (scanning.error(); as error) {
+      <p class="note error push">{{ error }}</p>
+    }
+    @if (scanning.value(); as scanned) {
+      <p class="note info push">
+        Perfil <strong>{{ scanned.name }}</strong> guardado:
+        {{ counted(scanned.slots.length, 'dato', 'datos') }} desde
+        {{ counted(scanned.sources.length, 'archivo', 'archivos') }}.
+      </p>
+    }
+  </section>
+
+  <section class="stack">
+    <div class="panel-title">
+      <h2>Guardados</h2>
+      <button class="quiet" type="button" (click)="reload()" [disabled]="profiles.pending()">
+        Recargar
+      </button>
+    </div>
+
+    @if (profiles.error(); as error) {
+      <p class="note error">{{ error }}</p>
+    } @else if (profiles.pending() && !profiles.value()) {
+      <p class="empty">Leyendo los perfiles...</p>
+    } @else if (profiles.value(); as list) {
+      @if (list.length === 0) {
+        <p class="empty">Todavía no hay ninguno. Escaneá un proyecto de la lista permitida.</p>
+      } @else {
+        <ul class="profile-list">
+          @for (profile of list; track profile.name) {
+            <li class="profile">
+              <a class="profile-name" [routerLink]="['/profiles', profile.name]">{{
+                profile.name
+              }}</a>
+              <span class="counts">
+                <span class="chip">{{ counted(profile.slot_count, 'dato', 'datos') }}</span>
+                <span class="chip">{{ counted(profile.source_count, 'fuente', 'fuentes') }}</span>
+              </span>
+
+              @if (confirming() === profile.name) {
+                <span class="confirm">
+                  <span class="hint">¿Borrar el perfil? El proyecto en disco no se toca.</span>
+                  <button
+                    class="danger"
+                    type="button"
+                    [disabled]="removing.pending()"
+                    (click)="remove(profile.name)"
+                  >
+                    Borrar
+                  </button>
+                  <button class="quiet" type="button" (click)="confirming.set(null)">
+                    Cancelar
+                  </button>
+                </span>
+              } @else {
+                <button class="quiet" type="button" (click)="confirming.set(profile.name)">
+                  Borrar
+                </button>
+              }
+            </li>
+          }
+        </ul>
+      }
+    }
+
+    @if (removing.error(); as error) {
+      <p class="note error">{{ error }}</p>
+    }
+  </section>
+</div>

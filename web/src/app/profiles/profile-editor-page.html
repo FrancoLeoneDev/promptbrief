@@ -1,0 +1,184 @@
+<div class="stack">
+  <nav class="crumbs">
+    <a routerLink="/profiles">Perfiles</a>
+    <span class="sep">/</span>
+    <span class="here">{{ name }}</span>
+  </nav>
+
+  @if (loaded.error(); as error) {
+    <p class="note error">{{ error }}</p>
+  }
+  @if (loaded.pending() && !draft()) {
+    <p class="empty">Abriendo el perfil...</p>
+  }
+
+  @if (draft(); as profile) {
+    <header class="head">
+      <div>
+        <h1>{{ profile.name }}</h1>
+        <p class="mono root">{{ profile.root }}</p>
+        <p class="row chips">
+          <span class="chip">{{ counted(profile.slots.length, 'dato', 'datos') }}</span>
+          <span class="chip">{{ counted(profile.sources.length, 'fuente', 'fuentes') }}</span>
+          <span class="chip">presupuesto {{ profile.budget_tokens }} tokens</span>
+          @if (needingReview()) {
+            <span class="chip review">{{ needingReview() }} sin revisar</span>
+          }
+        </p>
+      </div>
+
+      <div class="row head-actions">
+        <button type="button" (click)="sync()" [disabled]="syncing.pending()">
+          {{ syncing.pending() ? 'Comparando...' : 'Comparar con el disco' }}
+        </button>
+        <button type="button" class="quiet" (click)="discard()" [disabled]="!dirty()">
+          Descartar cambios
+        </button>
+        <button
+          type="button"
+          class="primary"
+          (click)="save()"
+          [disabled]="!dirty() || saving.pending()"
+        >
+          {{ saving.pending() ? 'Guardando...' : 'Guardar' }}
+        </button>
+      </div>
+    </header>
+
+    @if (saving.error(); as error) {
+      <p class="note error">{{ error }}</p>
+    }
+    @if (syncing.error(); as error) {
+      <p class="note error">{{ error }}</p>
+    }
+    @if (applying.error(); as error) {
+      <p class="note error">{{ error }}</p>
+    }
+    @if (dirty()) {
+      <p class="note warning">Hay cambios sin guardar. Guardar reemplaza el perfil entero.</p>
+    }
+
+    @if (syncing.value(); as diff) {
+      <app-sync-panel
+        [diff]="diff"
+        [applying]="applying.pending()"
+        (apply)="applySync()"
+        (dismiss)="syncing.clear()"
+      />
+    }
+
+    <section class="stack">
+      <div class="panel-title">
+        <h2>Datos destilados</h2>
+        <span class="hint">Cada uno dice de qué archivo y de qué línea salió</span>
+      </div>
+
+      @if (profile.slots.length === 0) {
+        <p class="empty">Este perfil no tiene datos. Compará con el disco y volvé a destilarlo.</p>
+      }
+
+      <ul class="slots">
+        @for (slot of profile.slots; track slot.id; let index = $index) {
+          <li class="slot" [class.needs-review]="slot.needs_review">
+            <div class="slot-head">
+              @if (slot.source) {
+                <span class="chip source">{{ slotLabel(slot) }}</span>
+              } @else {
+                <span class="chip">sin procedencia</span>
+              }
+              @if (slot.needs_review) {
+                <span class="chip review">sin revisar</span>
+              }
+              @if (slot.redacted) {
+                <span class="chip redacted">credencial tapada</span>
+              }
+              <span class="slot-id mono">{{ slot.id }}</span>
+            </div>
+
+            @if (slot.needs_review) {
+              <p class="note warning">
+                La destilación no supo qué clase de dato es, así que <strong>no se inyecta</strong>
+                en ningún brief. Elegí un tipo y destildá "sin revisar" para que entre.
+              </p>
+            }
+            @if (slot.redacted) {
+              <p class="note error">
+                Acá había algo con forma de credencial y quedó tapado antes de guardarse. Si el dato
+                importa, escribilo sin el secreto.
+              </p>
+            }
+
+            <textarea
+              rows="3"
+              [value]="slot.content"
+              (input)="patchSlot(index, { content: textOf($event) })"
+            ></textarea>
+
+            <div class="slot-controls">
+              <div class="control">
+                <label [attr.for]="'kind-' + index">Tipo</label>
+                <select
+                  [id]="'kind-' + index"
+                  [value]="slot.kind"
+                  (change)="setKind(index, textOf($event))"
+                >
+                  @for (kind of kinds; track kind) {
+                    <option [value]="kind">{{ kind }}</option>
+                  }
+                </select>
+              </div>
+
+              <div class="control wide">
+                <label>Se inyecta en</label>
+                <div class="row">
+                  @for (task of taskTypes; track task) {
+                    <label class="check">
+                      <input
+                        type="checkbox"
+                        [checked]="slot.applies_to.includes(task)"
+                        (change)="toggleAppliesTo(index, task, checkedOf($event))"
+                      />
+                      {{ taskTypeLabel(task) }}
+                    </label>
+                  }
+                  @if (slot.applies_to.length === 0) {
+                    <span class="hint">sin marcar ninguno, entra en todos</span>
+                  }
+                </div>
+              </div>
+
+              <div class="control">
+                <label>Estado</label>
+                <label class="check">
+                  <input
+                    type="checkbox"
+                    [checked]="slot.needs_review"
+                    (change)="patchSlot(index, { needs_review: checkedOf($event) })"
+                  />
+                  sin revisar
+                </label>
+              </div>
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">
+        <h2>Fuentes</h2>
+        <span class="hint">El hash es lo que delata que el archivo cambió desde el escaneo</span>
+      </div>
+      <ul class="sources">
+        @for (source of profile.sources; track source.path) {
+          <li>
+            <span class="mono">{{ source.path }}</span>
+            <span class="chip">{{ source.sha256.slice(0, 12) }}</span>
+          </li>
+        } @empty {
+          <li class="hint">No quedó registrada ninguna fuente.</li>
+        }
+      </ul>
+    </section>
+  }
+</div>

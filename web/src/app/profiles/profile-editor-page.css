@@ -1,0 +1,116 @@
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.crumbs a {
+  text-decoration: none;
+}
+
+.crumbs a:hover {
+  text-decoration: underline;
+}
+
+.crumbs .sep {
+  color: var(--faint);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.root {
+  margin: 0.3rem 0 0.6rem;
+  color: var(--muted);
+}
+
+.chips {
+  gap: 0.4rem;
+}
+
+.head-actions {
+  gap: 0.5rem;
+}
+
+.slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.slot.needs-review {
+  border-left-color: var(--warning);
+  background: var(--panel-raised);
+}
+
+.slot-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.slot-id {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 0.75rem;
+}
+
+.slot-controls {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.control label:first-child {
+  margin-bottom: 0.35rem;
+}
+
+.control.wide {
+  flex: 1;
+  min-width: 18rem;
+}
+
+.control select {
+  width: auto;
+  min-width: 9rem;
+}
+
+.sources {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sources li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--muted);
+}

@@ -1,0 +1,71 @@
+.scan-form {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  align-items: end;
+}
+
+.field.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding-bottom: 0.1rem;
+}
+
+.push {
+  margin-top: 0.9rem;
+}
+
+.profile-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.7rem 1rem;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+
+.profile:first-child {
+  border-top: none;
+}
+
+.profile-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.profile-name:hover {
+  text-decoration: underline;
+}
+
+.counts {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+@media (max-width: 46rem) {
+  .scan-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile {
+    flex-wrap: wrap;
+  }
+}

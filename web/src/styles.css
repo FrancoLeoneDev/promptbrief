@@ -1,0 +1,320 @@
+/*
+ * El sistema visual entero: variables, tipografía y los cinco elementos que se repiten
+ * (panel, botón, campo, chip, aviso). Cada componente pone acá su layout y nada más, así
+ * que un cambio de paleta o de radio se hace en un solo archivo.
+ *
+ * Es oscuro y de un solo tema a propósito: la herramienta se abre al lado de un editor.
+ */
+
+:root {
+  --bg: #14161c;
+  --panel: #1a1d25;
+  --panel-raised: #21252f;
+  --line: #2a2f3b;
+  --line-strong: #3a4150;
+
+  --text: #e7e9ef;
+  --muted: #99a2b3;
+  --faint: #6d7688;
+
+  --accent: #7aa2f7;
+  --accent-line: #3a4a72;
+  --accent-fill: #232b40;
+
+  --error: #f7768e;
+  --error-line: #5c2f3c;
+  --error-fill: #2a1c22;
+
+  --warning: #e0af68;
+  --warning-line: #574526;
+  --warning-fill: #26211a;
+
+  --info: #7dcfff;
+  --info-line: #2b4a5c;
+  --info-fill: #1a222a;
+
+  --ok: #9ece6a;
+
+  --radius: 6px;
+  --page-width: 68rem;
+  --page-gutter: 1.5rem;
+  --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    15px/1.6 ui-sans-serif,
+    system-ui,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+h1 {
+  font-size: 1.35rem;
+}
+
+h2 {
+  font-size: 1rem;
+}
+
+h3 {
+  font-size: 0.9rem;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+}
+
+code,
+pre {
+  font-family: var(--mono);
+}
+
+/* --- estructura ------------------------------------------------------------ */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.spread {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 1.1rem 1.25rem;
+}
+
+.panel-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.lead {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.hint {
+  color: var(--faint);
+  font-size: 0.82rem;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+/* --- campos ---------------------------------------------------------------- */
+
+label {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+
+input[type='text'],
+textarea,
+select {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+  line-height: 1.55;
+}
+
+input[type='text']:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+/* --- botones --------------------------------------------------------------- */
+
+button {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--panel-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+button.danger:hover:not(:disabled) {
+  border-color: var(--error-line);
+  background: var(--error-fill);
+  color: var(--error);
+}
+
+button.quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.3rem 0.5rem;
+}
+
+button.quiet:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--panel-raised);
+}
+
+/* --- chips y avisos -------------------------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--panel-raised);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.chip.source {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: var(--accent-fill);
+}
+
+.chip.review {
+  border-color: var(--warning-line);
+  color: var(--warning);
+  background: var(--warning-fill);
+}
+
+.chip.redacted {
+  border-color: var(--error-line);
+  color: var(--error);
+  background: var(--error-fill);
+}
+
+.note {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 4px;
+  background: var(--panel-raised);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.note.error {
+  border-color: var(--error-line);
+  border-left-color: var(--error);
+  background: var(--error-fill);
+  color: var(--text);
+}
+
+.note.warning {
+  border-color: var(--warning-line);
+  border-left-color: var(--warning);
+  background: var(--warning-fill);
+  color: var(--text);
+}
+
+.note.info {
+  border-color: var(--info-line);
+  border-left-color: var(--info);
+  background: var(--info-fill);
+  color: var(--text);
+}

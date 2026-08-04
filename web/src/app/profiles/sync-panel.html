@@ -1,0 +1,82 @@
+<section class="panel sync">
+  <div class="panel-title">
+    <h2>Comparación con el proyecto en disco</h2>
+    <button class="quiet" type="button" (click)="dismiss.emit()">Cerrar</button>
+  </div>
+
+  @if (changes() === 0) {
+    <p class="note info">
+      El perfil guardado dice lo mismo que una destilación fresca:
+      {{ counted(diff().unchanged.length, 'dato', 'datos') }} sin cambios.
+    </p>
+  } @else {
+    <p class="lead">
+      Esto es lo que cambiaría. Todavía no se escribió nada: el perfil guardado sigue como estaba.
+    </p>
+
+    @if (diff().added.length) {
+      <div class="group">
+        <h3 class="added">Aparecieron ({{ diff().added.length }})</h3>
+        <ul class="entries">
+          @for (slot of diff().added; track slot.id) {
+            <li>
+              <span class="chip source">{{ slotLabel(slot) }}</span>
+              <span class="text">{{ slot.content }}</span>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+
+    @if (diff().removed.length) {
+      <div class="group">
+        <h3 class="removed">Ya no están ({{ diff().removed.length }})</h3>
+        <ul class="entries">
+          @for (slot of diff().removed; track slot.id) {
+            <li>
+              <span class="chip source">{{ slotLabel(slot) }}</span>
+              <span class="text">{{ slot.content }}</span>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+
+    @if (diff().modified.length) {
+      <div class="group">
+        <h3 class="modified">Cambiaron ({{ diff().modified.length }})</h3>
+        <ul class="entries">
+          @for (change of diff().modified; track change.after.id) {
+            <li class="change">
+              <span class="chip source">{{ slotLabel(change.after) }}</span>
+              <div class="sides">
+                <div class="side before">
+                  <span class="side-label">antes</span>
+                  <span class="text">{{ change.before.content }}</span>
+                </div>
+                <div class="side after">
+                  <span class="side-label">después</span>
+                  <span class="text">{{ change.after.content }}</span>
+                </div>
+              </div>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+
+    <div class="apply">
+      <button class="primary" type="button" [disabled]="applying()" (click)="apply.emit()">
+        {{ applying() ? 'Aplicando...' : 'Volver a destilar y guardar' }}
+      </button>
+      <span class="hint">
+        Aplicar reemplaza el perfil por la destilación fresca: las ediciones manuales que hayas
+        guardado sobre estos datos se pierden.
+      </span>
+    </div>
+  }
+
+  <p class="hint sin-cambios">
+    {{ counted(diff().unchanged.length, 'dato queda', 'datos quedan') }} igual.
+  </p>
+</section>

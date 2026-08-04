@@ -1,0 +1,169 @@
+<div class="stack">
+  <section>
+    <h1>Generador</h1>
+    <p class="lead">
+      Escribí la tarea como se la contarías a alguien. El servidor decide qué le falta al pedido y
+      este formulario se arma con esa respuesta.
+    </p>
+  </section>
+
+  <div class="columns">
+    <div class="stack">
+      <section class="panel">
+        <div class="panel-title">
+          <h2>La tarea</h2>
+          @if (taskType(); as task) {
+            <span class="chip source">detectado: {{ taskTypeLabel(task) }}</span>
+          }
+        </div>
+
+        <label for="task-text">Qué querés que haga el agente</label>
+        <textarea
+          id="task-text"
+          rows="6"
+          placeholder="Arreglar el botón de exportar, que a veces manda el CSV vacío..."
+          [value]="text()"
+          (input)="text.set(textOf($event))"
+        ></textarea>
+
+        <div class="options">
+          <div class="control">
+            <label for="profile">Perfil del proyecto</label>
+            <select id="profile" [value]="profileName()" (change)="profileName.set(textOf($event))">
+              <option value="">Sin perfil</option>
+              @for (profile of profiles.value() ?? []; track profile.name) {
+                <option [value]="profile.name">{{ profile.name }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="control buttons">
+            <button
+              type="button"
+              (click)="analyze()"
+              [disabled]="linting.pending() || !text().trim()"
+            >
+              {{ linting.pending() ? 'Analizando...' : 'Analizar' }}
+            </button>
+            <button
+              type="button"
+              class="primary"
+              (click)="generate()"
+              [disabled]="generating.pending() || !text().trim()"
+            >
+              {{ generating.pending() ? 'Generando...' : 'Generar brief' }}
+            </button>
+          </div>
+        </div>
+
+        @if (profiles.error(); as error) {
+          <p class="note error push">{{ error }}</p>
+        }
+        @if (linting.error(); as error) {
+          <p class="note error push">{{ error }}</p>
+        }
+        @if (generating.error(); as error) {
+          <p class="note error push">{{ error }}</p>
+        }
+      </section>
+
+      @if (remarks().length) {
+        <section class="panel">
+          <div class="panel-title">
+            <h2>Sobre cómo está escrito</h2>
+            <span class="hint">No son campos que falten: son defectos del texto</span>
+          </div>
+          <div class="stack remarks">
+            @for (remark of remarks(); track remark.rule_id) {
+              <div class="note" [class]="remark.severity">
+                <strong>{{ remark.message }}</strong>
+                <p class="hint">{{ remark.suggestion }}</p>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      @if (questions().length) {
+        <section class="panel">
+          <div class="panel-title">
+            <h2>Lo que falta</h2>
+            <span class="hint">Cada campo lo pidió una regla del servidor</span>
+          </div>
+
+          <div class="stack questions">
+            @for (question of questions(); track question.slot) {
+              <div class="question" [class.answered]="question.answered">
+                <div class="question-head">
+                  <span class="chip" [class]="question.finding.severity">{{ question.slot }}</span>
+                  @if (question.answered) {
+                    <span class="chip source">resuelto</span>
+                  }
+                </div>
+
+                <label [attr.for]="'q-' + question.slot">{{ question.finding.message }}</label>
+                <p class="hint">{{ question.finding.suggestion }}</p>
+
+                @if (isListSlot(question.slot)) {
+                  <div class="rows">
+                    @for (row of rowsOf(question.slot); track $index; let index = $index) {
+                      <div class="row-item">
+                        <input
+                          type="text"
+                          [id]="index === 0 ? 'q-' + question.slot : null"
+                          [value]="row"
+                          (input)="answerRow(question.slot, index, textOf($event))"
+                        />
+                        <button
+                          class="quiet"
+                          type="button"
+                          aria-label="Quitar"
+                          (click)="removeRow(question.slot, index)"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    }
+                    <button class="quiet add" type="button" (click)="addRow(question.slot)">
+                      Agregar otro
+                    </button>
+                  </div>
+                } @else {
+                  <textarea
+                    [id]="'q-' + question.slot"
+                    rows="2"
+                    [value]="answerOf(question.slot)"
+                    (input)="answer(question.slot, textOf($event))"
+                  ></textarea>
+                }
+              </div>
+            }
+          </div>
+        </section>
+      }
+    </div>
+
+    <div class="stack">
+      @if (generating.value(); as brief) {
+        <section class="panel">
+          <div class="panel-title">
+            <h2>Brief</h2>
+            <button type="button" (click)="copy(brief.text)">
+              {{ copied() ? 'Copiado' : 'Copiar' }}
+            </button>
+          </div>
+          <pre class="brief">{{ brief.text }}</pre>
+        </section>
+
+        <app-selection-panel [selection]="brief.selection" />
+      } @else {
+        <section class="panel placeholder">
+          <p class="lead">
+            El brief va a aparecer acá. Contestá lo que falte y generalo: lo que salga se pega tal
+            cual en el agente.
+          </p>
+        </section>
+      }
+    </div>
+  </div>
+</div>

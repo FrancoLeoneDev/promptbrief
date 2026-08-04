@@ -1,0 +1,29 @@
+<section class="panel">
+  <div class="panel-title">
+    <h2>Contexto del perfil</h2>
+  </div>
+
+  <div class="groups">
+    @for (group of groups(); track group.title) {
+      <div class="group" [class]="group.tone">
+        <h3>
+          {{ group.title }}
+          <span class="count">{{ group.slots.length }}</span>
+        </h3>
+        @if (group.slots.length) {
+          <p class="reason">{{ group.reason }}</p>
+          <ul>
+            @for (slot of group.slots; track slot.id) {
+              <li>
+                <span class="chip source">{{ slotLabel(slot) }}</span>
+                <span class="content">{{ slot.content }}</span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="reason empty-reason">Ninguno.</p>
+        }
+      </div>
+    }
+  </div>
+</section>
