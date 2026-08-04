@@ -116,7 +116,7 @@ portfolio-demo
 
 Runs the rule set against a task description without generating a brief. Exits non-zero if any finding is an error.
 
-`lint` and `brief` take the same options, so anything that lints clean builds a brief with no errors under it: `--profile NAME`, `--success`, `--format`, `--file`, `--repro`, `--expected`, `--constraint` and `--example`. The last three are repeatable — one flag per file, constraint or example. Which ones a request needs depends on the task type the classifier picks: a debug task *errors* without `--repro` and `--expected`, a writing task warns without `--example`, and a code change warns without `--constraint` unless the profile supplies one. The rules read those fields, not the prose, so a description that narrates the reproduction steps inside `TEXT` still counts as missing them.
+`lint` and `brief` take the same options, so anything that lints clean builds a brief with no errors under it: `--profile NAME`, `--success`, `--format`, `--file`, `--repro`, `--expected`, `--constraint` and `--example`. `--file`, `--constraint` and `--example` are repeatable — one flag per file, constraint or example. Which ones a request needs depends on the task type the classifier picks: a debug task *errors* without `--repro` and `--expected`, a writing task warns without `--example`, and a code change warns without `--constraint` unless the profile supplies one. The rules read those fields, not the prose, so a description that narrates the reproduction steps inside `TEXT` still counts as missing them.
 
 ```bash
 $ pbrief lint "arreglalo"

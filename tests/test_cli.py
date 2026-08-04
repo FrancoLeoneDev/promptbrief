@@ -123,7 +123,8 @@ def test_a_distilled_profile_survives_the_round_trip_into_the_brief(tmp_path, mo
         "\n"  # 6
         "## Prohibiciones\n"  # 7
         "\n"  # 8
-        "- No usar librerías de routing fuera del App Router\n",  # 9
+        "- No usar librerías de routing fuera del App Router\n"  # 9
+        "- Mantener el schema de la base sin cambios\n",  # 10
         encoding="utf-8",
     )
 
@@ -153,9 +154,15 @@ def test_a_distilled_profile_survives_the_round_trip_into_the_brief(tmp_path, mo
     constraints = result.stdout[
         result.stdout.index("<constraints>") : result.stdout.index("</constraints>")
     ]
-    # La prohibición entra al brief reformulada en positivo (F3), no como estaba escrita.
+    # La prohibición en negativo entra al brief reformulada en positivo (F3), no como
+    # estaba escrita. Ese camino lo fuerza _to_positive, que promueve el bullet a
+    # CONSTRAINT sin mirar el heading.
     assert "Resolver sin usar librerías de routing fuera del App Router" in constraints
     assert "No usar" not in constraints
+    # La que ya venía en positivo no la toca _to_positive: llega a <constraints>
+    # únicamente porque el heading "## Prohibiciones" la mapea a CONSTRAINT. Sin esta
+    # afirmación, romper ese mapeo no rompe ningún test.
+    assert "Mantener el schema de la base sin cambios" in constraints
 
 
 def test_lint_with_a_profile_reaches_the_context_rules(tmp_path, monkeypatch):
