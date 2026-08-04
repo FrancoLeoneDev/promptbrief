@@ -1,0 +1,51 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "serve",
+      "detail": "Levanta la API y el front compilado en http://127.0.0.1:8765",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m",
+        "promptbrief.cli",
+        "serve",
+        "--allow",
+        "${workspaceFolder}",
+        "--allow",
+        "${workspaceFolder}/.."
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "build front",
+      "detail": "Recompila el Angular. Hace falta después de tocar algo de web/src.",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "build"],
+      "options": { "cwd": "${workspaceFolder}/web" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "build front y serve",
+      "detail": "Recompila y después levanta. Es el ciclo completo tras tocar el front.",
+      "dependsOrder": "sequence",
+      "dependsOn": ["build front", "serve"],
+      "problemMatcher": []
+    },
+    {
+      "label": "tests",
+      "detail": "Corre la suite de Python (sin los tests lentos).",
+      "type": "shell",
+      "command": "python",
+      "args": ["-m", "pytest", "-q"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    }
+  ]
+}
