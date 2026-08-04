@@ -26,6 +26,7 @@ from promptbrief.core.profile.store import (
     validate_profile_name,
 )
 from promptbrief.server.errors import to_http_exception
+from promptbrief.server.frontend import DEFAULT_WEB_DIST, install_frontend
 from promptbrief.server.paths import checked_root
 from promptbrief.server.schemas import (
     BriefOut,
@@ -54,11 +55,19 @@ def _stored_profile(name: str) -> Profile:
         raise StoredProfileCorrupt(str(error)) from error
 
 
-def create_app(config: SecurityConfig, allowed_roots: Sequence[Path]) -> FastAPI:
+def create_app(
+    config: SecurityConfig,
+    allowed_roots: Sequence[Path],
+    web_dist: Path | None = None,
+) -> FastAPI:
     """Arma la app local: allowlist en el estado, seguridad montada y las rutas.
 
     `allowed_roots` vive en `app.state` y no en un global porque el test la cambia por
     request y el día que haya dos apps en el mismo proceso un global las mezclaría.
+
+    `web_dist` es el directorio que dejó `npm run build`. Es un parámetro y no una
+    constante importada para que el test pueda apuntarlo a un build de mentira sin tocar
+    el disco del repo; en producción el default alcanza.
     """
     app = FastAPI(title="PromptBrief", version="0.1.0")
     app.state.allowed_roots = allowed_roots
@@ -195,5 +204,6 @@ def create_app(config: SecurityConfig, allowed_roots: Sequence[Path]) -> FastAPI
         http_error = to_http_exception(error)
         return JSONResponse({"detail": http_error.detail}, status_code=http_error.status_code)
 
+    install_frontend(app, config, web_dist or DEFAULT_WEB_DIST)
     install_security(app, config)
     return app

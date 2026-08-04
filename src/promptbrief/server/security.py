@@ -15,7 +15,9 @@ TOKEN_HEADER = "X-PromptBrief-Token"
 MAX_BODY_BYTES = 1_000_000
 MIN_TOKEN_LENGTH = 32
 _SAFE_FETCH_SITES = frozenset({"same-origin", "same-site", "none"})
-_API_PREFIX = "/api"
+# Público porque el front estático se define por descarte: es todo lo que no es la API,
+# y las dos mitades tienen que estar de acuerdo sobre dónde queda el corte.
+API_PREFIX = "/api"
 _TOKEN_HEADER_BYTES = TOKEN_HEADER.lower().encode("ascii")
 
 
@@ -49,6 +51,23 @@ class SecurityConfig:
     @classmethod
     def generate(cls, port: int) -> SecurityConfig:
         return cls(token=secrets.token_urlsafe(32), port=port)
+
+    def token_matches(self, provided: str | bytes | None) -> bool:
+        """True si `provided` es el token de la sesión. Comparación en tiempo constante.
+
+        Acepta `bytes` y `str` porque los dos consumidores llegan con lo que tienen a
+        mano: la guarda con el header crudo, el documento con el query param ya
+        decodificado. La igualdad la decide un solo lugar, así que no hay dos criterios
+        que se puedan separar el día que uno de los dos cambie.
+
+        `compare_digest` sobre `str` exige ASCII puro y con un `ñ` levanta `TypeError`
+        —un 500 que dispara cualquiera sin conocer el token—, así que todo se compara
+        en bytes.
+        """
+        if provided is None:
+            return False
+        raw = provided.encode("utf-8") if isinstance(provided, str) else provided
+        return hmac.compare_digest(raw, self.token.encode("utf-8"))
 
 
 def _raw_header(scope: Scope, name: bytes) -> bytes | None:
@@ -101,7 +120,7 @@ class SecurityGuard:
         await self.app(scope, receive, send)
 
     def _rejection(self, scope: Scope) -> tuple[int, str] | None:
-        if scope.get("path", "").startswith(_API_PREFIX) and not self._token_matches(scope):
+        if scope.get("path", "").startswith(API_PREFIX) and not self._token_matches(scope):
             return 401, "Falta el token o no coincide."
 
         # El Host es lo único anómalo en una request de DNS rebinding: el atacante
@@ -123,19 +142,19 @@ class SecurityGuard:
         return None
 
     def _token_matches(self, scope: Scope) -> bool:
-        """Compara el token del header, en bytes y en tiempo constante.
-
-        En bytes y no en str porque `hmac.compare_digest` sobre strings exige ASCII
-        puro: un `ñ` en el header le arranca un TypeError, o sea un 500 que cualquiera
-        dispara sin conocer el token.
+        """El token del header, y solo del header.
 
         La query string ni se mira: ahí el token queda escrito en el access log de
-        uvicorn y en el historial del navegador.
+        uvicorn y en el historial del navegador. Que la API lo exija por un header
+        custom es además lo que la hace inmune a CSRF por construcción — un header así
+        no se puede mandar cross-origin sin preflight, y el preflight se come un 401
+        porque no hay CORS instalado.
+
+        El documento inicial es la única excepción y no vive acá: el navegador no puede
+        poner un header en la carga de una URL, así que `frontend.py` acepta el token
+        por query param para servir el shell, y nada más.
         """
-        provided = _raw_header(scope, _TOKEN_HEADER_BYTES)
-        if provided is None:
-            return False
-        return hmac.compare_digest(provided, self.config.token.encode("utf-8"))
+        return self.config.token_matches(_raw_header(scope, _TOKEN_HEADER_BYTES))
 
 
 class BodyLimit:

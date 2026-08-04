@@ -141,6 +141,17 @@ def test_the_generated_config_is_unguessable_and_fresh():
     assert SecurityConfig.generate(port=8765).token != first.token
 
 
+def test_the_token_comparison_takes_bytes_and_str_alike():
+    # El header llega crudo y el query param del documento llega decodificado: si cada
+    # uno comparara por su cuenta, serían dos criterios de igualdad que se separan.
+    assert CONFIG.token_matches(CONFIG.token)
+    assert CONFIG.token_matches(CONFIG.token.encode())
+    assert not CONFIG.token_matches(None)
+    assert not CONFIG.token_matches("")
+    assert not CONFIG.token_matches("ñoño")
+    assert not CONFIG.token_matches(CONFIG.token[:-1])
+
+
 def test_a_short_token_is_refused_at_construction():
     # Un SecurityConfig(token="") abriría el servidor entero.
     with pytest.raises(ValueError):

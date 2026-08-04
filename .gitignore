@@ -4,3 +4,9 @@ __pycache__/
 .ruff_cache/
 .venv/
 dist/
+
+# Front: dependencias, salida del build y caché del compilador. `dist/` de arriba ya
+# taparía `web/dist/`, pero escrito así se lee qué es lo que no entra al repo.
+web/node_modules/
+web/dist/
+web/.angular/
