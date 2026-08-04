@@ -13,7 +13,9 @@ from promptbrief.core.models import BriefRequest, Finding, Severity
 from promptbrief.core.profile.distill import distill_project
 from promptbrief.core.profile.store import list_profiles, save_profile
 
-app = typer.Typer(help="Turns informal descriptions into structured briefs for coding agents.")
+app = typer.Typer(
+    help="Convierte descripciones informales en briefs estructurados para agentes de código."
+)
 
 _MARK = {Severity.ERROR: "[error]", Severity.WARNING: "[warn ]", Severity.INFO: "[info ]"}
 
@@ -93,7 +95,12 @@ def scan(
 
     needs_review = [slot.label() for slot in profile.slots if slot.needs_review]
     if needs_review:
-        typer.echo(f"  {len(needs_review)} sin clasificar: no se inyectan hasta revisarlos")
+        typer.echo(
+            f"  {len(needs_review)} sin clasificar: no se inyectan. Para que entren hay "
+            "que corregirles 'kind' y poner 'needs_review: false' en el YAML del perfil; "
+            "con needs_review solo, el dato entra como <unclassified> y aplica a todos "
+            "los tipos de tarea."
+        )
     redacted = [slot.label() for slot in profile.slots if slot.redacted]
     if redacted:
         typer.echo(f"  credenciales tapadas en: {', '.join(redacted)}")

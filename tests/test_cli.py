@@ -89,6 +89,22 @@ def test_brief_prints_the_rendered_xml():
     assert "<success_criteria>" in result.stdout
 
 
+def test_scan_names_both_fields_to_edit_on_unclassified_slots(tmp_path, monkeypatch):
+    monkeypatch.setenv("PROMPTBRIEF_HOME", str(tmp_path / "home"))
+    project = tmp_path / "vago"
+    project.mkdir()
+    (project / "CLAUDE.md").write_text(
+        "# Vago\n\n## Notas sueltas\n\n- Algo que no encaja en ningún heading conocido\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["scan", str(project)])
+    assert result.exit_code == 0
+    assert "sin clasificar" in result.stdout
+    assert "kind" in result.stdout
+    assert "needs_review" in result.stdout
+
+
 def test_a_distilled_profile_survives_the_round_trip_into_the_brief(tmp_path, monkeypatch):
     """De un CLAUDE.md real al brief, pasando por el YAML: la afirmación central.
 
