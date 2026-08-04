@@ -69,7 +69,18 @@ def create_app(
     constante importada para que el test pueda apuntarlo a un build de mentira sin tocar
     el disco del repo; en producción el default alcanza.
     """
-    app = FastAPI(title="PromptBrief", version="0.1.0")
+    # Los tres viven bajo `/api` y no en su default (`/docs`, `/redoc`, `/openapi.json`)
+    # porque ahí caían del lado del front: `FrontendFallback` sirve todo lo que no
+    # cuelga de `/api`, así que la ubicación default quedaba tapada por el index de
+    # Angular y era config muerta. Bajo `/api` caen además dentro de la guarda de
+    # `SecurityGuard`, que exige el token por header en cualquier ruta con ese prefijo.
+    app = FastAPI(
+        title="PromptBrief",
+        version="0.1.0",
+        docs_url="/api/docs",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json",
+    )
     app.state.allowed_roots = allowed_roots
 
     @app.get("/api/health")

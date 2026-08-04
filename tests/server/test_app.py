@@ -49,3 +49,10 @@ def test_an_internal_bug_surfaces_as_500(api):
 
 def test_the_allowlist_reaches_the_app_state(api, tmp_path):
     assert api.app.state.allowed_roots == (tmp_path,)
+
+
+def test_docs_live_under_api_and_need_the_token(api):
+    # Bajo /api para no quedar tapados por FrontendFallback, y por eso mismo exigen el
+    # token igual que cualquier otra ruta de la API.
+    assert api.get("/api/docs").status_code == 200
+    assert TestClient(api.app).get("/api/docs").status_code == 401
