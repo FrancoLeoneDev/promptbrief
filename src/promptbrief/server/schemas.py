@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -259,6 +260,25 @@ class BriefRequestBody(BaseModel):
             examples=tuple(self.examples),
             repro_steps=self.repro_steps,
             expected_vs_actual=self.expected_vs_actual,
+        )
+
+
+class LintOut(BaseModel):
+    """Los hallazgos sin el brief renderizado.
+
+    Trae el `task_type` resuelto igual que `BriefOut`: qué reglas corrieron depende de
+    él, así que sin ese campo el cliente no puede explicar por qué falta `repro_steps`
+    en un pedido que él nunca marcó como debug.
+    """
+
+    task_type: TaskType
+    findings: list[FindingOut] = Field(default_factory=list)
+
+    @classmethod
+    def of(cls, findings: Sequence[Finding], task_type: TaskType) -> LintOut:
+        return cls(
+            task_type=task_type,
+            findings=[FindingOut.of(finding) for finding in findings],
         )
 
 

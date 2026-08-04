@@ -6,7 +6,8 @@ from pathlib import Path
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
-from promptbrief.core.build import resolve_profile
+from promptbrief.core.build import build_brief, lint, resolve_profile
+from promptbrief.core.classify import classify
 from promptbrief.core.errors import (
     ProfileCorrupt,
     ProfileNotFound,
@@ -14,7 +15,7 @@ from promptbrief.core.errors import (
     RootNotFound,
     StoredProfileCorrupt,
 )
-from promptbrief.core.models import Profile
+from promptbrief.core.models import BriefRequest, Profile
 from promptbrief.core.profile.diff import diff_profiles
 from promptbrief.core.profile.distill import distill_project
 from promptbrief.core.profile.scan import scan_project
@@ -26,7 +27,16 @@ from promptbrief.core.profile.store import (
 )
 from promptbrief.server.errors import to_http_exception
 from promptbrief.server.paths import checked_root
-from promptbrief.server.schemas import DiffOut, ProfileIn, ProfileOut, ProfileSummary, ScanBody
+from promptbrief.server.schemas import (
+    BriefOut,
+    BriefRequestBody,
+    DiffOut,
+    LintOut,
+    ProfileIn,
+    ProfileOut,
+    ProfileSummary,
+    ScanBody,
+)
 from promptbrief.server.security import SecurityConfig, install_security
 
 
@@ -133,6 +143,46 @@ def create_app(config: SecurityConfig, allowed_roots: Sequence[Path]) -> FastAPI
         """Borra el perfil. No toca el proyecto en disco, solo el YAML destilado."""
         delete_profile(name)
         return Response(status_code=204)
+
+    def prepared(body: BriefRequestBody) -> tuple[BriefRequest, Path | None]:
+        """El pedido del core y la raíz ya autorizada, cuando el pedido trae perfil.
+
+        La raíz sale por separado para pasársela **explícita** a `build_brief` y a
+        `lint`: si no se la pasan, el core sigue el `root` del perfil por su cuenta y
+        `stale_sources` hashea lo que haya ahí. Eso convierte cualquiera de los dos
+        endpoints en un oráculo de existencia de archivos y en un hasheador sin tope de
+        tamaño, sobre cualquier ruta del disco.
+
+        Un perfil en el body gana sobre `profile_name` —es la pantalla de edición
+        mandando cambios sin guardar—, y los dos pasan por la misma guarda: uno que
+        llegó por HTTP no es más confiable que uno que salió del disco.
+        """
+        profile: Profile | None = None
+        if body.profile is not None:
+            profile = body.profile.to_profile()
+        elif body.profile_name:
+            profile = _stored_profile(body.profile_name)
+
+        root = None if profile is None else checked_root(profile.root, app.state.allowed_roots)
+        task_type = body.task_type or classify(body.text)
+        return body.to_request(task_type=task_type, profile=profile), root
+
+    @app.post("/api/brief")
+    def brief(body: BriefRequestBody) -> BriefOut:
+        """Arma el brief y devuelve, además del texto, la selección y los hallazgos."""
+        request, root = prepared(body)
+        return BriefOut.of(build_brief(request, root), request.task_type)
+
+    @app.post("/api/lint")
+    def lint_only(body: BriefRequestBody) -> LintOut:
+        """Los mismos hallazgos que `/api/brief`, sin renderizar el brief.
+
+        Es lo que consume el interrogatorio del front: cada hallazgo trae el
+        `slot_name` del campo que le falta, así el formulario se arma sin hardcodear
+        ninguna regla.
+        """
+        request, root = prepared(body)
+        return LintOut.of(lint(request, root), request.task_type)
 
     @app.exception_handler(PromptBriefError)
     async def promptbrief_error(request: Request, error: PromptBriefError) -> JSONResponse:
