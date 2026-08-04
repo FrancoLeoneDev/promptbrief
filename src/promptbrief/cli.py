@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import webbrowser
 from collections.abc import Sequence
 from pathlib import Path
 from typing import NoReturn
@@ -116,6 +117,57 @@ def profiles() -> None:
         return
     for profile_name in names:
         typer.echo(profile_name)
+
+
+@app.command(
+    # El help corto va acá y no sale del docstring: typer imprime el docstring entero
+    # en `serve --help`, y el de abajo explica decisiones de diseño que le importan a
+    # quien lee el código, no a quien quiere levantar el servidor.
+    help="Levanta la API local para el front. Escucha solo en 127.0.0.1."
+)
+def serve(
+    port: int = typer.Option(8765, "--port", help="Puerto local"),
+    allow: list[str] = typer.Option(
+        [], "--allow", help="Directorio de proyecto permitido (repetible; por defecto, el actual)"
+    ),
+    no_browser: bool = typer.Option(False, "--no-browser", help="No abrir el navegador"),
+) -> None:
+    """Levanta la API local que consume el front, con un token nuevo por arranque.
+
+    Escucha únicamente en 127.0.0.1 y **no hay opción `--host`**: el servidor expone el
+    disco de la máquina acotado a `--allow`, así que escuchar en otra interfaz no es un
+    default configurable, es otro producto. Quien lo necesite, que ponga un túnel
+    adelante y decida ahí su propia autenticación.
+
+    El token va en la URL que se imprime porque es la única forma de que el navegador
+    lo reciba en la carga inicial del documento; de ahí en más viaja por header. Por
+    eso uvicorn corre con `access_log=False`: su log escribe la query string entera, y
+    un token en un archivo de log sobrevive a la sesión que lo generó.
+    """
+    # Importes diferidos: fastapi y uvicorn tardan bastante más en cargar que el resto
+    # de la CLI, y ningún otro comando los necesita.
+    import uvicorn
+
+    from promptbrief.server.app import create_app
+    from promptbrief.server.security import SecurityConfig
+
+    roots = tuple(Path(path).resolve() for path in allow) or (Path.cwd().resolve(),)
+    config = SecurityConfig.generate(port)
+    url = f"{config.origin}/?token={config.token}"
+
+    typer.echo(f"PromptBrief escuchando en {config.origin}")
+    for root in roots:
+        typer.echo(f"  proyectos permitidos: {root}")
+    typer.echo(f"Abrí esta URL, que lleva el token de la sesión:\n  {url}")
+    if not no_browser:
+        webbrowser.open(url)
+
+    uvicorn.run(
+        create_app(config, allowed_roots=roots),
+        host="127.0.0.1",
+        port=port,
+        access_log=False,
+    )
 
 
 @app.command(name="lint")

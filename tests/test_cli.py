@@ -1,8 +1,35 @@
+import re
+import webbrowser
+from pathlib import Path
+
+import uvicorn
+from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
 from promptbrief.cli import app
+from promptbrief.server.security import TOKEN_HEADER
 
 runner = CliRunner()
+
+
+def run_serve(monkeypatch, *args):
+    """Corre `serve` con uvicorn desactivado. Devuelve (resultado, lo que recibió uvicorn)."""
+    captured = {}
+
+    def fake_run(served_app, **kwargs):
+        captured["app"] = served_app
+        captured["kwargs"] = kwargs
+
+    monkeypatch.setattr(uvicorn, "run", fake_run)
+    result = runner.invoke(app, ["serve", "--no-browser", *args])
+    assert result.exit_code == 0, result.stdout
+    return result, captured
+
+
+def printed_token(result):
+    match = re.search(r"\?token=(\S+)", result.stdout)
+    assert match, result.stdout
+    return match.group(1)
 
 
 def write_project(tmp_path, folder="proj"):
@@ -289,3 +316,70 @@ def test_an_empty_request_reports_cleanly():
     result = runner.invoke(app, ["brief", "   "])
     assert result.exit_code == 1
     assert "Traceback" not in result.stdout
+
+
+def test_serve_listens_only_on_loopback_and_without_an_access_log(monkeypatch, tmp_path):
+    _, captured = run_serve(monkeypatch, "--port", "8899", "--allow", str(tmp_path))
+
+    assert captured["kwargs"]["host"] == "127.0.0.1"
+    assert captured["kwargs"]["port"] == 8899
+    # El access log de uvicorn escribe la query string entera, y ahí va el token.
+    assert captured["kwargs"]["access_log"] is False
+
+
+def test_serve_hands_the_app_the_allowlist_it_was_given(monkeypatch, tmp_path):
+    other = tmp_path / "otro"
+    other.mkdir()
+    _, captured = run_serve(monkeypatch, "--allow", str(tmp_path), "--allow", str(other))
+
+    assert captured["app"].state.allowed_roots == (tmp_path.resolve(), other.resolve())
+
+
+def test_serve_allows_the_current_directory_by_default(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    _, captured = run_serve(monkeypatch)
+
+    assert captured["app"].state.allowed_roots == (Path.cwd().resolve(),)
+
+
+def test_the_printed_url_carries_a_token_the_app_actually_accepts(monkeypatch, tmp_path):
+    result, captured = run_serve(monkeypatch, "--port", "8899", "--allow", str(tmp_path))
+
+    client = TestClient(captured["app"])
+    client.headers.update({"Host": "127.0.0.1:8899"})
+    assert client.get("/api/health").status_code == 401
+
+    client.headers[TOKEN_HEADER] = printed_token(result)
+    assert client.get("/api/health").json()["status"] == "ok"
+
+
+def test_two_runs_do_not_share_a_token(monkeypatch, tmp_path):
+    # Un token fijo entre arranques sobreviviría en el historial del navegador y
+    # seguiría abriendo el servidor de mañana.
+    first, _ = run_serve(monkeypatch, "--allow", str(tmp_path))
+    second, _ = run_serve(monkeypatch, "--allow", str(tmp_path))
+
+    assert printed_token(first) != printed_token(second)
+
+
+def test_the_browser_opens_with_the_token_unless_it_is_disabled(monkeypatch, tmp_path):
+    opened = []
+    monkeypatch.setattr(webbrowser, "open", opened.append)
+    monkeypatch.setattr(uvicorn, "run", lambda *args, **kwargs: None)
+
+    result = runner.invoke(app, ["serve", "--allow", str(tmp_path)])
+    assert result.exit_code == 0
+    assert opened == [f"http://127.0.0.1:8765/?token={printed_token(result)}"]
+
+    run_serve(monkeypatch, "--allow", str(tmp_path))
+    assert len(opened) == 1
+
+
+def test_serve_has_no_host_flag():
+    # Escuchar en otra interfaz no es un default configurable: el servidor expone el
+    # disco de la máquina acotado a --allow.
+    result = runner.invoke(app, ["serve", "--help"])
+    assert result.exit_code == 0
+    assert "--host" not in result.stdout
+    assert "--port" in result.stdout
+    assert "--allow" in result.stdout

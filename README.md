@@ -167,6 +167,24 @@ $ pbrief brief "Add a Python section" --profile portfolio-demo --success "cards 
          -> Elegí una: cambios de código con rutas, una lista de opciones, un diff, un texto.
 ```
 
+### `pbrief serve [--port N] [--allow PATH] [--no-browser]`
+
+Runs the local HTTP API the web front consumes — the same core the CLI calls, exposed as JSON over `127.0.0.1`. `--allow` marks a directory as scannable and is repeatable; with none given, the current directory is the only one allowed. `--no-browser` skips opening the printed URL.
+
+```bash
+$ pbrief serve --allow C:\Franco\Proyectos
+PromptBrief escuchando en http://127.0.0.1:8765
+  proyectos permitidos: C:\Franco\Proyectos
+Abrí esta URL, que lleva el token de la sesión:
+  http://127.0.0.1:8765/?token=Yx3n0_R7pQ...
+```
+
+**Why the URL carries a token.** Anything running in the browser can reach `127.0.0.1` — a page you have open in another tab, an ad on it, a local process. "It's only localhost" is not an authentication boundary, and this server reads files and writes profiles. So every start generates a fresh random token: it goes in the URL only for the initial document load, and from there the front sends it in the `X-PromptBrief-Token` header. It's never accepted from the query string on API calls, and uvicorn's access log is turned off (`access_log=False`) — that log records the full query string, and a token written to a file outlives the session that created it. The token is also checked in constant time, on raw bytes, so a non-ASCII value can't turn the comparison into a 500.
+
+**Why there is no `--host`.** The server exposes the machine's filesystem, narrowed to whatever `--allow` lists; binding it to another interface isn't a configurable default, it's a different product with a different threat model. Beyond binding, requests are rejected unless the `Host` header is `127.0.0.1`/`localhost` on the serving port — that's what stops DNS rebinding, where an attacker's domain resolves to `127.0.0.1` so the request is same-origin, carries no `Origin`, and would otherwise look local. `Sec-Fetch-Site` and `Origin` are checked on top of that, and bodies are capped at 1 MB counting bytes as they arrive, since a `Transfer-Encoding: chunked` request has no `Content-Length` to trust.
+
+Every path that reaches the disk — the `root` of a scan, the `root` of a profile the client saves, the `root` a sync re-distills, and the one `brief`/`lint` hash to detect a stale profile — is checked against the `--allow` list on each request, not just the first time it's seen. A profile saved with `root: "C:/"` is rejected at 403 when saved *and* when used, because a stored value is not more trustworthy for having been stored.
+
 ## Running the tests
 
 ```bash
