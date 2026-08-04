@@ -162,9 +162,11 @@ def create_app(
         endpoints en un oráculo de existencia de archivos y en un hasheador sin tope de
         tamaño, sobre cualquier ruta del disco.
 
-        Un perfil en el body gana sobre `profile_name` —es la pantalla de edición
-        mandando cambios sin guardar—, y los dos pasan por la misma guarda: uno que
-        llegó por HTTP no es más confiable que uno que salió del disco.
+        Un perfil en el body gana sobre `profile_name`. Es una capacidad del contrato
+        que el front todavía no ejercita —`BriefRequest` en `models.ts` no tiene campo
+        `profile`, solo `profile_name`— pensada para un cliente que quiera probar
+        cambios sin guardarlos primero. Los dos caminos pasan por la misma guarda: uno
+        que llegó por HTTP no es más confiable que uno que salió del disco.
         """
         profile: Profile | None = None
         if body.profile is not None:
