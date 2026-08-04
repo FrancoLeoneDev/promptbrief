@@ -23,3 +23,27 @@ class ProfileNotFound(PromptBriefError):
 
 class ProfileCorrupt(PromptBriefError):
     """El YAML del perfil existe pero no tiene la forma esperada."""
+
+
+class NoKnownSources(PromptBriefError):
+    """El directorio no tiene ninguna de las fuentes que PromptBrief sabe leer."""
+
+
+class ProfileAlreadyExists(PromptBriefError):
+    """Ya hay un perfil con ese nombre y no se pidió sobrescribirlo."""
+
+
+class RootNotFound(PromptBriefError):
+    """El directorio del proyecto no existe o no es un directorio.
+
+    Hereda de PromptBriefError a propósito: para un consumidor HTTP esto es culpa
+    del pedido (4xx), no una falla del servidor.
+    """
+
+
+class StoredProfileCorrupt(ProfileCorrupt):
+    """El perfil guardado en disco está deformado.
+
+    Se distingue de ProfileCorrupt porque el cliente no lo mandó ni puede arreglarlo
+    reenviando otra cosa: es integridad de datos del servidor, y va a 500.
+    """

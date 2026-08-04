@@ -26,17 +26,22 @@ def profiles_dir() -> Path:
     return base / "projects"
 
 
+def validate_profile_name(name: str) -> None:
+    """Levanta InvalidProfileName si el nombre no sirve como nombre de archivo seguro."""
+    if not _SAFE_NAME.fullmatch(name) or name.upper() in _WINDOWS_RESERVED:
+        raise InvalidProfileName(
+            f"Nombre de perfil inválido: {name!r}. "
+            "Se permiten letras, números, punto, guion y guion bajo (hasta 64)."
+        )
+
+
 def _profile_path(name: str, directory: Path) -> Path:
     """Ruta del perfil, validando que el nombre no escape del directorio.
 
     Sin esto, un nombre con `..` escapa; y en Windows un nombre absoluto como
     `C:\\evil` hace que `directory / name` descarte `directory` por completo.
     """
-    if not _SAFE_NAME.fullmatch(name) or name.upper() in _WINDOWS_RESERVED:
-        raise InvalidProfileName(
-            f"Nombre de perfil inválido: {name!r}. "
-            "Se permiten letras, números, punto, guion y guion bajo (hasta 64)."
-        )
+    validate_profile_name(name)
     path = (directory / f"{name}.yml").resolve()
     if not path.is_relative_to(directory.resolve()):
         raise InvalidProfileName(f"Nombre de perfil inválido: {name!r}")

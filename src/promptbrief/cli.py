@@ -8,10 +8,16 @@ import typer
 
 from promptbrief.core.build import build_brief, lint, resolve_profile
 from promptbrief.core.classify import classify
-from promptbrief.core.errors import PromptBriefError
+from promptbrief.core.errors import (
+    InvalidProfileName,
+    NoKnownSources,
+    ProfileAlreadyExists,
+    PromptBriefError,
+    RootNotFound,
+)
 from promptbrief.core.models import BriefRequest, Finding, Severity
-from promptbrief.core.profile.distill import distill_project
-from promptbrief.core.profile.store import list_profiles, save_profile
+from promptbrief.core.profile.scan import scan_project
+from promptbrief.core.profile.store import list_profiles
 
 app = typer.Typer(
     help="Convierte descripciones informales en briefs estructurados para agentes de código."
@@ -73,22 +79,17 @@ def scan(
 ) -> None:
     """Destila CLAUDE.md, AGENTS.md, README.md y package.json en un perfil."""
     root = Path(path).resolve()
-    if not root.is_dir():
-        _fail(f"No existe el directorio {root}")
-
-    profile = distill_project(root, name=name)
-    if not profile.sources:
-        _fail(f"No encontré CLAUDE.md, AGENTS.md, README.md ni package.json en {root}")
-    if profile.name in list_profiles() and not force:
+    try:
+        profile, saved = scan_project(root, name=name, force=force)
+    except ProfileAlreadyExists as error:
         _fail(
-            f"Ya existe el perfil '{profile.name}'. Usá --force para sobrescribirlo "
+            f"{error} Usá --force para sobrescribirlo "
             "(vas a perder las ediciones manuales del YAML)."
         )
-
-    try:
-        saved = save_profile(profile)
-    except PromptBriefError as error:
+    except InvalidProfileName as error:
         _fail(f"{error} Usá --name para elegir un nombre de perfil válido.")
+    except (RootNotFound, NoKnownSources) as error:
+        _fail(str(error))
 
     typer.echo(f"Perfil '{profile.name}' guardado en {saved}")
     typer.echo(f"  {len(profile.slots)} datos desde {len(profile.sources)} archivos")
