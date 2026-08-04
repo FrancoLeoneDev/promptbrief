@@ -192,22 +192,28 @@ def test_a_failed_replace_does_not_leave_an_orphaned_temp_file(tmp_path, monkeyp
     assert list(tmp_path.glob("*.tmp")) == []
 
 
+@pytest.mark.slow
 def test_concurrent_writes_never_leave_a_truncated_file(tmp_path):
     # Los endpoints con `def` corren en un threadpool: la concurrencia es real.
     #
-    # El tamaño de acá no es arbitrario. Con el tamaño original de este test (200 slots
-    # de 500 caracteres, 4 hilos, 20 iteraciones) sabotear `save_profile` a un
-    # `write_text` puro (sin temporal ni `os.replace`) solo se ponía rojo 2 de cada 3
-    # corridas: la ventana en la que un lector puede abrir el archivo a mitad de una
-    # escritura no atómica es demasiado corta para que la contención la encuentre de
-    # forma confiable. Medido en esta máquina (Windows, disco local): con un solo slot
-    # de 1 500 000 caracteres (~1.5 MB), 4 hilos y 12 iteraciones, el sabotaje se puso
-    # rojo 5 de 5 corridas (1-2 errores por corrida, medido con `pytest.raises`
-    # reemplazado por un harness que corre el cuerpo del test 5 veces seguidas) y la
-    # versión atómica real se mantuvo en 0 errores en 2 corridas de `pytest` seguidas.
-    # El costo es real: cada corrida de este test tarda ~50-70s en esta máquina (contra
-    # <1s del resto de la suite). Se prefiere una suite más lenta a un guard que no
-    # guarda.
+    # Por qué es caro (4 hilos × 12 iteraciones × un slot de 1 500 000 caracteres,
+    # ~1.5 MB): el tamaño de acá no es arbitrario, y bajarlo rompe la garantía, medido.
+    # Con el tamaño original de este test (200 slots de 500 caracteres, 4 hilos, 20
+    # iteraciones, ~100 KB en total) sabotear `save_profile` a un `write_text` puro
+    # (sin temporal ni `os.replace`) solo se ponía rojo 2 de cada 3 corridas: la
+    # ventana en la que un lector puede abrir el archivo a mitad de una escritura no
+    # atómica es demasiado corta para que la contención la encuentre de forma
+    # confiable — un guard que no guarda es peor que no tenerlo. Subir hilos (6-8) en
+    # vez de tamaño llegaba a 5/5 en el sabotaje pero rompía la versión real (el
+    # propio `os.replace` atómico empezaba a agotar su presupuesto de reintentos bajo
+    # esa contención). Lo que sí escala sin ese costo es el tamaño del contenido a
+    # hilos fijos: un `write_text` de más bytes tarda más en completarse, alargando la
+    # ventana vulnerable sin subir la contención sobre el `os.replace` real. Con estos
+    # parámetros el sabotaje se puso rojo 5 de 5 corridas (1-2 errores por corrida) y
+    # la versión atómica real se mantuvo en 0 errores en corridas repetidas de
+    # `pytest`. El costo es real: cada corrida tarda ~70-75s en esta máquina, ~97% del
+    # tiempo total de la suite — por eso vive detrás de `@pytest.mark.slow` en vez de
+    # correr por default (ver "Running the tests" en el README).
     from promptbrief.core.profile.store import load_profile, save_profile
 
     big = Profile(

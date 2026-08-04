@@ -173,3 +173,14 @@ $ pbrief brief "Add a Python section" --profile portfolio-demo --success "cards 
 python -m pytest -v
 python -m ruff check .
 ```
+
+The default run excludes tests marked `slow` (`addopts = "-m 'not slow'"` in `pyproject.toml`),
+so it finishes in a couple of seconds. There's currently one: a filesystem-concurrency test that
+sabotages `save_profile`'s atomicity across real threads and a multi-megabyte file to prove the
+guard actually guards — by design that takes over a minute, since a smaller, faster version of
+the same test stopped reliably catching the regression it exists to catch. Run it explicitly
+(CI does, as a separate step) with:
+
+```bash
+python -m pytest -v -m slow
+```

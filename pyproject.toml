@@ -17,6 +17,10 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not slow'"
+markers = [
+    "slow: real-time, multi-second tests (e.g. filesystem concurrency races) excluded by default; run with `pytest -m slow`.",
+]
 
 [tool.ruff]
 line-length = 100
