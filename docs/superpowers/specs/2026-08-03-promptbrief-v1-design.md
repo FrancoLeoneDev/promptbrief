@@ -274,22 +274,53 @@ Estas defensas están en `core/` a propósito, no en el servidor del Plan 2. Hoy
 
 ## 10. Servidor y front
 
-**Servidor** — FastAPI, solo en `127.0.0.1`. Capa fina: valida entrada, llama a `core/`, devuelve JSON.
+Esta sección se reescribió el 2026-08-03, después de que el core estuviera terminado y de que dos auditorías señalaran que el contrato de seguridad del servidor estaba a medias.
 
-| Endpoint | Qué hace |
+**Servidor** — FastAPI, solo en `127.0.0.1`. Capa fina: valida entrada, llama a `core/`, devuelve JSON. Si un endpoint necesita lógica que no sea traducción HTTP, esa lógica va a `core/`.
+
+| Endpoint | Primitiva de `core/` | Estado |
+|---|---|---|
+| `GET /api/profiles` | `list_profiles()` | existe |
+| `GET /api/profiles/{name}` | `load_profile(name)` | existe |
+| `POST /api/profiles/scan` | `scan_project(root, name, force)` | **falta** — hoy la política vive en la CLI |
+| `POST /api/profiles` | `save_profile(profile)` | existe, falta el mapeo desde JSON |
+| `POST /api/profiles/{name}/sync` | `diff_profiles(old, new)` | **falta** |
+| `POST /api/brief` | `build_brief(request, root)` | existe |
+| `POST /api/lint` | `lint(request, root)` | existe |
+
+### Lo que falta en `core/` antes de escribir el servidor
+
+**`scan_project(root, name, force) -> Profile`.** Hoy la política de "no hay fuentes conocidas → error" y "ya existe el perfil y no pasaste `--force` → error" vive en `cli.py`. Es política, no presentación: el servidor la necesita igual y la duplicaría. Va a `core/profile/`.
+
+**`slot_to_dict` / `slot_from_dict` públicas.** Ya existen en `store.py` con prefijo `_`, y ya producen dicts JSON-friendly (usan `.value` de los enums). El servidor las necesita para serializar y para aceptar el perfil editado; sin promoverlas, reimplementa el mapeo y aparece una segunda fuente de verdad.
+
+**`diff_profiles(old, new) -> ProfileDiff`.** El endpoint de sync tiene que decir *qué cambió*, y `stale_sources` solo dice *qué archivo* cambió. El problema real: como los IDs derivan del contenido, un bullet editado no es "mismo id, contenido nuevo" sino **un id nuevo que reemplaza a uno viejo**. Un diff ingenuo por id reportaría todo como agregado y borrado.
+
+La reconciliación tiene tres pasos:
+1. Los ids que están en los dos perfiles son **sin cambios**.
+2. De lo que queda, los que comparten `(source.file, kind)` y son uno solo de cada lado se reportan como **modificados**, con el par viejo/nuevo para que la UI muestre el antes y el después.
+3. El resto son **agregados** o **eliminados**.
+
+El paso 2 es una heurística y hay que decirlo: dos bullets editados bajo el mismo heading y en el mismo archivo son ambiguos. En ese caso caen a agregado/eliminado, que es el resultado conservador.
+
+### Contrato de seguridad del servidor
+
+**Escuchar solo en loopback NO alcanza**, y es el error más común en servidores locales. Cualquier página abierta en el navegador del usuario puede hacer `fetch("http://127.0.0.1:PUERTO/api/...")`. El origen es el navegador de la víctima, no un atacante remoto, así que el firewall no lo ve.
+
+| Defensa | Qué previene |
 |---|---|
-| `GET /api/profiles` | Lista los perfiles |
-| `POST /api/profiles/scan` | Destila un directorio y devuelve el perfil propuesto |
-| `POST /api/profiles` | Guarda el perfil (posiblemente editado) |
-| `POST /api/profiles/{id}/sync` | Re-destila y reporta qué cambió |
-| `POST /api/brief` | Texto + tipo de tarea + respuestas → brief + hallazgos |
-| `POST /api/lint` | Solo hallazgos, sin brief |
+| **Token de sesión**, generado aleatoriamente al arrancar, exigido en todas las requests. `pbrief serve` abre el navegador con el token en la URL | La defensa principal. Una página cualquiera puede llegar a `127.0.0.1` pero **no puede adivinar el token**. Es lo que hace que las otras defensas sean redundantes y no únicas |
+| **Validación de `Origin` y `Host`** contra el origen propio | DNS rebinding, que es el ataque que sortea el chequeo de IP |
+| **Límite de tamaño del body** | El `text` de un `POST /api/lint` corre las reglas sobre el string completo; sin cota, el costo crece sin límite |
+| **Allowlist de directorios para escanear** | `core/` valida los **nombres de perfil**, pero trata `root` como confiable por diseño. Sin allowlist, `POST /api/profiles/scan` es un lector de archivos arbitrario |
+| **Validación de esquema en `POST /api/profiles`** | Un perfil malformado persistido una vez rompe todas las lecturas posteriores. `load_profile` ya traduce a `ProfileCorrupt`; el servidor tiene que rechazar **antes** de escribir |
+| **Mapeo de errores** | `PromptBriefError` y sus subclases → 4xx. Cualquier otra excepción → 500. La jerarquía existe para que esto sea una sola línea |
 
 **Front** — Angular con componentes standalone y signals. Tres pantallas: lista de perfiles, editor de perfil (slots editables, con la procedencia visible), y generador (textarea → preguntas → brief con botón de copiar y los hallazgos al costado).
 
 Se sirve como estático desde FastAPI, así `pbrief serve` levanta una sola cosa. El front nunca toca el disco: todo pasa por la API local.
 
-**Seguridad:** el servidor escucha solo en loopback y valida que los paths a escanear estén dentro de directorios permitidos. Un servidor local que acepta rutas arbitrarias es un lector de archivos remoto si alguien lo expone.
+**El modo demo público** (Vercel) es una build distinta del mismo front: sin `scan`, sin acceso al filesystem, con el perfil pegado o subido a mano. Se hace **después** de que la versión local funcione, y no comparte servidor con ella.
 
 ---
 
