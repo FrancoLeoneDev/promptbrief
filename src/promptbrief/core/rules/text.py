@@ -88,6 +88,11 @@ class VagueQuantifier(Rule):
 
 
 class NegativeInstruction(Rule):
+    """Detecta instrucciones en negativo y sugiere la formulación positiva.
+
+    Es F3 del spec: "decile qué hacer, no qué no hacer".
+    """
+
     id = "negative_instruction"
     family = Family.TEXT
     severity = Severity.INFO
@@ -117,6 +122,11 @@ class MultipleUnrelatedTasks(Rule):
 
 
 class OverEmphasis(Rule):
+    """Detecta lenguaje agresivo: mayúsculas sostenidas, CRITICAL/MUST/NUNCA repetidos.
+
+    Es F5 del spec: ese lenguaje hace sobre-disparar a los modelos actuales.
+    """
+
     id = "over_emphasis"
     family = Family.TEXT
     severity = Severity.INFO

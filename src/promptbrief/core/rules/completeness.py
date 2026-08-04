@@ -64,6 +64,12 @@ class MissingConstraints(CompletenessRule):
 
 
 class MissingExamples(CompletenessRule):
+    """Exige ejemplos en tareas de escritura.
+
+    Es F7 del spec: los ejemplos few-shot son de lo más efectivo para fijar
+    tono y formato.
+    """
+
     id = "missing_examples"
     slot_name = "examples"
     severity = Severity.WARNING

@@ -13,6 +13,12 @@ MIN_APPLICABLE_RATIO = 0.5
 
 
 class BudgetExceeded(Rule):
+    """Avisa que un slot aplicable quedó afuera del brief por falta de presupuesto.
+
+    Es F4 del spec: el *context rot* — a más tokens, peor recuperación — es la
+    razón de tener un presupuesto de atención en primer lugar.
+    """
+
     id = "budget_exceeded"
     family = Family.CONTEXT
     severity = Severity.ERROR
@@ -30,6 +36,13 @@ class BudgetExceeded(Rule):
 
 
 class ProfileMostlyIrrelevant(Rule):
+    """Avisa que la mayoría de los datos del perfil no aplicaron a esta tarea.
+
+    Relacionada con F4 del spec (*context rot*): un perfil mal calibrado hace que
+    el selector descarte casi todo por tipo de tarea antes de llegar al presupuesto,
+    señal de que vale la pena revisar el `applies_to` de los slots.
+    """
+
     id = "profile_mostly_irrelevant"
     family = Family.CONTEXT
     severity = Severity.INFO
