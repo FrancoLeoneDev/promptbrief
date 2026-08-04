@@ -29,7 +29,13 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - run: npm ci
+      # `npm install` y no `npm ci`: el lock se genera en Windows, donde npm no puede
+      # resolver las variantes opcionales que solo existen en Linux (@emnapi/*, que
+      # entran por los binarios nativos del build de Angular). `npm ci` exige que el
+      # lock esté sincronizado exactamente y falla en el runner por dependencias que
+      # la máquina de desarrollo no puede anotar. Se pierde algo de reproducibilidad
+      # a cambio de un CI que corre; el lock igual fija las versiones de todo lo demás.
+      - run: npm install --no-audit --no-fund
       - run: npx prettier --check "src/**/*.{ts,html,css}"
       - run: npm run build
       # Sin --watch: en un runner sin TTY el default ya es false, pero dejarlo escrito
