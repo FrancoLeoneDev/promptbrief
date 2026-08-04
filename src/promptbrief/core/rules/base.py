@@ -23,13 +23,14 @@ class Rule(ABC):
     @abstractmethod
     def check(self, ctx: CheckContext) -> Finding | None: ...
 
-    def _finding(self, message: str, suggestion: str) -> Finding:
+    def _finding(self, message: str, suggestion: str, slot_name: str | None = None) -> Finding:
         return Finding(
             rule_id=self.id,
             family=self.family,
             severity=self.severity,
             message=message,
             suggestion=suggestion,
+            slot_name=slot_name,
         )
 
 

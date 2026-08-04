@@ -42,21 +42,6 @@ _MIN_SHOUTED_WORDS = 2
 _MIN_TASK_SEPARATORS = 1
 
 
-class MissingSuccessCriteria(Rule):
-    id = "missing_success_criteria"
-    family = Family.TEXT
-    severity = Severity.ERROR
-
-    def check(self, ctx: CheckContext) -> Finding | None:
-        if ctx.request.success_criteria:
-            return None
-        return self._finding(
-            "No declaraste cuándo la tarea está terminada.",
-            "Agregá qué tiene que pasar para considerarla lista: un test que pasa, "
-            "algo que se ve en pantalla, un número que baja.",
-        )
-
-
 class DanglingReference(Rule):
     id = "dangling_reference"
     family = Family.TEXT
@@ -151,7 +136,6 @@ class OverEmphasis(Rule):
 
 
 TEXT_RULES: tuple[Rule, ...] = (
-    MissingSuccessCriteria(),
     DanglingReference(),
     VagueQuantifier(),
     NegativeInstruction(),

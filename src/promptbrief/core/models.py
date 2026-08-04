@@ -127,6 +127,7 @@ class Finding:
     severity: Severity
     message: str
     suggestion: str
+    slot_name: str | None = None
 
 
 @dataclass(frozen=True)

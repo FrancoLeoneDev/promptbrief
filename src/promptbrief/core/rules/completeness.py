@@ -15,6 +15,25 @@ class CompletenessRule(Rule):
     family = Family.COMPLETENESS
     slot_name: str
 
+    def _finding(self, message: str, suggestion: str, slot_name: str | None = None) -> Finding:
+        return super()._finding(message, suggestion, slot_name=slot_name or self.slot_name)
+
+
+class MissingSuccessCriteria(CompletenessRule):
+    id = "missing_success_criteria"
+    slot_name = "success_criteria"
+    severity = Severity.ERROR
+    applies_to = tasks_requiring("success_criteria")
+
+    def check(self, ctx: CheckContext) -> Finding | None:
+        if ctx.request.success_criteria:
+            return None
+        return self._finding(
+            "No declaraste cuándo la tarea está terminada.",
+            "Agregá qué tiene que pasar para considerarla lista: un test que pasa, "
+            "algo que se ve en pantalla, un número que baja.",
+        )
+
 
 class MissingOutputFormat(CompletenessRule):
     id = "missing_output_format"
@@ -117,6 +136,7 @@ class MissingExpectedVsActual(CompletenessRule):
 
 
 COMPLETENESS_RULES: tuple[Rule, ...] = (
+    MissingSuccessCriteria(),
     MissingOutputFormat(),
     MissingFileScope(),
     MissingConstraints(),

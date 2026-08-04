@@ -10,16 +10,6 @@ def text_findings(text: str, **kwargs) -> dict[str, Severity]:
     return fired(TEXT_RULES, text=text, **kwargs)
 
 
-def test_missing_success_criteria_fires_when_absent():
-    assert "missing_success_criteria" in text_findings("agregar una seccion de python")
-
-
-def test_missing_success_criteria_silent_when_provided():
-    assert "missing_success_criteria" not in text_findings(
-        "agregar una seccion", success_criteria="se ve igual que game dev"
-    )
-
-
 def test_dangling_reference_fires_on_a_pronoun_with_no_antecedent():
     assert "dangling_reference" in text_findings("arreglalo por favor")
     assert "dangling_reference" in text_findings("hace que ande")

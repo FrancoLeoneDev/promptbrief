@@ -18,10 +18,24 @@ def test_each_rule_applies_exactly_where_required_slots_says():
         assert set(rule.applies_to) == expected, rule.id
 
 
+def test_missing_success_criteria_is_now_part_of_this_family():
+    assert any(rule.id == "missing_success_criteria" for rule in COMPLETENESS_RULES)
+
+
 def test_every_required_slot_has_a_rule_guarding_it():
+    # Ya no hay excepción: success_criteria dejó de ser el caso especial.
     guarded = {rule.slot_name for rule in COMPLETENESS_RULES}
-    required = set().union(*REQUIRED_SLOTS.values())
-    assert required - guarded == {"success_criteria"}, "success_criteria lo cubre la familia A"
+    assert set().union(*REQUIRED_SLOTS.values()) == guarded
+
+
+def test_missing_success_criteria_fires_when_absent():
+    assert "missing_success_criteria" in completeness(TaskType.CODE_CHANGE)
+
+
+def test_missing_success_criteria_silent_when_provided():
+    assert "missing_success_criteria" not in completeness(
+        TaskType.CODE_CHANGE, success_criteria="se ve igual que game dev"
+    )
 
 
 def test_missing_output_format_fires_on_every_task_type():
