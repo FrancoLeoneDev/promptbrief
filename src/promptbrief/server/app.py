@@ -11,9 +11,12 @@ from promptbrief.core.errors import (
     ProfileCorrupt,
     ProfileNotFound,
     PromptBriefError,
+    RootNotFound,
     StoredProfileCorrupt,
 )
 from promptbrief.core.models import Profile
+from promptbrief.core.profile.diff import diff_profiles
+from promptbrief.core.profile.distill import distill_project
 from promptbrief.core.profile.scan import scan_project
 from promptbrief.core.profile.store import (
     delete_profile,
@@ -23,7 +26,7 @@ from promptbrief.core.profile.store import (
 )
 from promptbrief.server.errors import to_http_exception
 from promptbrief.server.paths import checked_root
-from promptbrief.server.schemas import ProfileIn, ProfileOut, ProfileSummary, ScanBody
+from promptbrief.server.schemas import DiffOut, ProfileIn, ProfileOut, ProfileSummary, ScanBody
 from promptbrief.server.security import SecurityConfig, install_security
 
 
@@ -99,6 +102,26 @@ def create_app(config: SecurityConfig, allowed_roots: Sequence[Path]) -> FastAPI
             )
         save_profile(profile)
         return ProfileOut.of(profile)
+
+    @app.post("/api/profiles/{name}/sync")
+    def sync(name: str) -> DiffOut:
+        """Compara el perfil guardado contra una destilación fresca del proyecto.
+
+        **No escribe nada:** es un preview. Para aplicar los cambios el front vuelve a
+        llamar a `POST /api/profiles/scan` con `force=true`. Separar mirar de aplicar
+        es lo que permite mostrar el diff y que el usuario decida, en vez de pisarle
+        las ediciones manuales del YAML por el solo hecho de haber abierto la pantalla.
+
+        El `root` del perfil pasa por la allowlist aunque venga del disco del servidor:
+        un YAML editado a mano —o guardado cuando la allowlist era otra— puede apuntar
+        a cualquier lado, y destilarlo devolvería por HTTP el contenido de ese
+        directorio.
+        """
+        profile = _stored_profile(name)
+        root = checked_root(profile.root, app.state.allowed_roots)
+        if not root.is_dir():
+            raise RootNotFound(f"No existe el directorio {root}")
+        return DiffOut.of(diff_profiles(profile, distill_project(root, name=profile.name)))
 
     @app.get("/api/profiles/{name}")
     def get_one(name: str) -> ProfileOut:

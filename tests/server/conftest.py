@@ -6,6 +6,20 @@ from promptbrief.server.security import TOKEN_HEADER, SecurityConfig
 
 CONFIG = SecurityConfig(token="t" * 40, port=8765)
 
+CLAUDE = "# Proj\n\n## Convenciones\n\n- Static export is enabled in next.config.ts\n"
+
+
+def write_project(tmp_path, folder="proj", body=CLAUDE):
+    """Un proyecto mínimo con un CLAUDE.md destilable. El bullet cae en la línea 5."""
+    project = tmp_path / folder
+    project.mkdir(parents=True, exist_ok=True)
+    (project / "CLAUDE.md").write_text(body, encoding="utf-8")
+    return project
+
+
+def scan(api, project, **extra):
+    return api.post("/api/profiles/scan", json={"root": str(project), **extra})
+
 
 @pytest.fixture
 def api(tmp_path, monkeypatch):

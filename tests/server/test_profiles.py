@@ -1,17 +1,6 @@
 import pytest
 
-CLAUDE = "# Proj\n\n## Convenciones\n\n- Static export is enabled in next.config.ts\n"
-
-
-def write_project(tmp_path, folder="proj", body=CLAUDE):
-    project = tmp_path / folder
-    project.mkdir(parents=True, exist_ok=True)
-    (project / "CLAUDE.md").write_text(body, encoding="utf-8")
-    return project
-
-
-def scan(api, project, **extra):
-    return api.post("/api/profiles/scan", json={"root": str(project), **extra})
+from .conftest import scan, write_project
 
 
 def test_the_profile_list_starts_empty(api):
