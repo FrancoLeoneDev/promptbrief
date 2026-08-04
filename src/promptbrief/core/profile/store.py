@@ -4,17 +4,13 @@ import os
 import re
 import time
 import uuid
-from collections.abc import Callable
 from pathlib import Path
-from typing import TypeVar
 
 import yaml
 
 from promptbrief.core.errors import InvalidProfileName, ProfileCorrupt, ProfileNotFound
 from promptbrief.core.models import Profile
 from promptbrief.core.profile.serialize import profile_from_dict, profile_to_dict
-
-_T = TypeVar("_T")
 
 # fullmatch, no match: con `$` el motor acepta un \n final y dejaría pasar "perfil\n".
 _SAFE_NAME = re.compile(r"[A-Za-z0-9._-]{1,64}")
@@ -69,31 +65,47 @@ def save_profile(profile: Profile, directory: Path | None = None) -> Path:
     payload = profile_to_dict(profile)
     text = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
     tmp_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
-    tmp_path.write_text(text, encoding="utf-8")
-    _retry_on_permission_error(lambda: os.replace(tmp_path, path))
+    try:
+        tmp_path.write_text(text, encoding="utf-8")
+        _retry_replace(tmp_path, path)
+    finally:
+        # Si `write_text` o `os.replace` fallan definitivamente, el temporal no puede
+        # quedar huérfano: `list_profiles` globea solo `*.yml` y nunca lo vería, así
+        # que sería basura invisible que crece con cada intento fallido. Una vez que
+        # `os.replace` tuvo éxito, `tmp_path` ya no existe y esto es un no-op.
+        tmp_path.unlink(missing_ok=True)
     return path
 
 
-def _retry_on_permission_error(action: Callable[[], _T]) -> _T:
-    """Reintenta `action` ante un `PermissionError` transitorio en Windows.
+# `os.replace` es atómico incluso bajo esta carrera: nunca deja un lector viendo un
+# archivo truncado. El reintento de abajo no arregla eso — arregla que, en Windows,
+# la propia llamada al rename puede fallar con "acceso denegado" mientras otro hilo
+# tiene el destino abierto para lectura (dura microsegundos). Acotado a Windows: en
+# POSIX un PermissionError es un EACCES real (permisos, no una carrera de
+# compartición), y reintentarlo solo demora un error genuino.
+_MAX_REPLACE_ATTEMPTS = 80
+_REPLACE_RETRY_WINDOW = 1.0  # segundos: muy por debajo del tarpit de 2s de un
+# threadpool de FastAPI bloqueado por un antivirus.
 
-    `os.replace()` es atómico, pero en Windows un hilo que tiene el destino abierto
-    para lectura puede hacer que el rename (o, simétricamente, la próxima apertura del
-    lector) devuelva momentáneamente "acceso denegado" mientras el sistema de archivos
-    resuelve la carrera — dura microsegundos, no es corrupción. Reintentar con backoff
-    corto absorbe esa carrera de compartición sin tocar la atomicidad real de
-    `os.replace`, que sigue garantizando que ningún lector ve un archivo truncado.
-    """
-    deadline = time.monotonic() + 2.0
+
+def _retry_replace(source: Path, destination: Path) -> None:
+    if os.name != "nt":
+        os.replace(source, destination)
+        return
+
+    deadline = time.monotonic() + _REPLACE_RETRY_WINDOW
     delay = 0.001
+    attempts = 0
     while True:
         try:
-            return action()
+            os.replace(source, destination)
+            return
         except PermissionError:
-            if time.monotonic() >= deadline:
+            attempts += 1
+            if attempts >= _MAX_REPLACE_ATTEMPTS or time.monotonic() >= deadline:
                 raise
             time.sleep(delay)
-            delay = min(delay * 2, 0.05)
+            delay = min(delay * 2, 0.02)
 
 
 def load_profile(name: str, directory: Path | None = None) -> Profile:
@@ -107,15 +119,44 @@ def load_profile(name: str, directory: Path | None = None) -> Profile:
         raise ProfileNotFound(f"No existe el perfil '{name}' en {path.parent}")
 
     try:
-        text = _retry_on_permission_error(lambda: path.read_text(encoding="utf-8"))
-        data = yaml.safe_load(text)
+        data = yaml.safe_load(_read_profile_text(path))
     except yaml.YAMLError as error:
         raise ProfileCorrupt(f"El perfil '{name}' no es YAML válido: {error}") from error
 
-    if not isinstance(data, dict):
-        raise ProfileCorrupt(f"El perfil '{name}' no tiene un mapeo en la raíz.")
-
     return profile_from_dict(data, label=f"el perfil '{name}'")
+
+
+_MAX_READ_ATTEMPTS = 8
+_READ_RETRY_WINDOW = 0.02  # segundos: deliberadamente corta, ver docstring.
+
+
+def _read_profile_text(path: Path) -> str:
+    """Lee el YAML, con un reintento breve ante un `PermissionError` transitorio en Windows.
+
+    Es la otra cara de `_retry_replace`: mientras `os.replace()` resuelve el rename,
+    una lectura que llega justo en el medio puede toparse con la misma carrera de
+    compartición y fallar con "acceso denegado", una ventana de microsegundos.
+
+    La ventana acá es deliberadamente mucho más corta que la de `_retry_replace`: un
+    reintento generoso del lado del lector diluiría la garantía que el test de
+    concurrencia viene a proteger. Si `save_profile` dejara de ser atómico (por
+    ejemplo, volviera a `write_text` puro), un lector con reintentos largos podría
+    terminar esperando a que la escritura no atómica termine y ver siempre una versión
+    completa — vieja o nueva —, escondiendo la regresión en vez de detectarla.
+    """
+    if os.name != "nt":
+        return path.read_text(encoding="utf-8")
+
+    deadline = time.monotonic() + _READ_RETRY_WINDOW
+    attempts = 0
+    while True:
+        try:
+            return path.read_text(encoding="utf-8")
+        except PermissionError:
+            attempts += 1
+            if attempts >= _MAX_READ_ATTEMPTS or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.001)
 
 
 def list_profiles(directory: Path | None = None) -> list[str]:

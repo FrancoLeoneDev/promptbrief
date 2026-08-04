@@ -19,13 +19,32 @@ def _text(value: Any, field: str, label: str) -> str:
     return value
 
 
+def _integer(value: Any, field: str, label: str) -> int:
+    """Exige que `value` sea un int (no un bool), o levanta ProfileCorrupt.
+
+    Misma clase de bug que `_text`: un `{"line": "doce"}` pasaba sin control y recién
+    explotaba lejos de acá, el día que alguien hiciera aritmética con `Provenance.line`.
+    """
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ProfileCorrupt(f"En {label}, '{field}' debe ser un entero, no {value!r}.")
+    return value
+
+
 def _safe_relative_path(value: Any, field: str, label: str) -> str:
     """Exige un `sources[].path` relativo, sin `..`, en cualquier convención de separador.
 
     `Path("C:/base") / "C:/Windows/win.ini"` descarta la base entera en Windows, así
     que un path absoluto guardado en el perfil convierte stale_sources en un lector de
     rutas arbitrarias. Se chequean las dos convenciones de separador (Windows y POSIX)
-    porque `PureWindowsPath.is_absolute()` no detecta `/etc/passwd` como absoluto.
+    porque `PureWindowsPath.is_absolute()` no detecta `/etc/passwd` como absoluto, y a
+    la inversa `PurePosixPath` no trata `\\` como separador.
+
+    `is_absolute()` por sí solo no alcanza: en Windows, `\\Windows\\win.ini` tiene raíz
+    pero no unidad, así que `PureWindowsPath(...).is_absolute()` da False — es "rooted"
+    pero relativo a la unidad actual, y sigue pudiendo escapar la base. `C:foo` tiene
+    unidad pero no raíz (relativo a la unidad actual): no escapa la base, pero tampoco
+    hay motivo para aceptarlo. Por eso se chequean `.root` y `.drive` además de
+    `is_absolute()`.
     """
     text = _text(value, field, label)
     windows_path = PureWindowsPath(text)
@@ -33,6 +52,8 @@ def _safe_relative_path(value: Any, field: str, label: str) -> str:
     if (
         windows_path.is_absolute()
         or posix_path.is_absolute()
+        or windows_path.root
+        or windows_path.drive
         or ".." in windows_path.parts
         or ".." in posix_path.parts
     ):
@@ -56,17 +77,39 @@ def slot_to_dict(slot: Slot) -> dict[str, Any]:
     return data
 
 
-def slot_from_dict(data: dict[str, Any], *, label: str = "el perfil") -> Slot:
+def slot_from_dict(data: Any, *, label: str = "el perfil") -> Slot:
+    """Reconstruye un Slot desde un dict "crudo".
+
+    Valida que `data` sea un mapeo por sí misma, no solo cuando la llama
+    `profile_from_dict`: es pública, y la API HTTP que la va a usar directamente le
+    puede pasar cualquier cosa que haya llegado en un body JSON.
+    """
+    if not isinstance(data, dict):
+        raise ProfileCorrupt(
+            f"En {label}, el slot no es un mapeo, sino {type(data).__name__}."
+        )
     source = data.get("source")
-    return Slot(
-        id=_text(data["id"], "id", label),
-        kind=SlotKind(data.get("kind", SlotKind.UNCLASSIFIED.value)),
-        content=_text(data["content"], "content", label),
-        applies_to=tuple(TaskType(task) for task in data.get("applies_to", [])),
-        source=Provenance(file=source["file"], line=source["line"]) if source else None,
-        needs_review=data.get("needs_review", False),
-        redacted=data.get("redacted", False),
-    )
+    if source is not None and not isinstance(source, dict):
+        raise ProfileCorrupt(f"En {label}, 'source' debe ser un mapeo, no {source!r}.")
+    try:
+        return Slot(
+            id=_text(data["id"], "id", label),
+            kind=SlotKind(data.get("kind", SlotKind.UNCLASSIFIED.value)),
+            content=_text(data["content"], "content", label),
+            applies_to=tuple(TaskType(task) for task in data.get("applies_to", [])),
+            source=(
+                Provenance(
+                    file=_text(source["file"], "source.file", label),
+                    line=_integer(source["line"], "source.line", label),
+                )
+                if source
+                else None
+            ),
+            needs_review=data.get("needs_review", False),
+            redacted=data.get("redacted", False),
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise ProfileCorrupt(f"En {label}, el slot tiene un campo inválido: {error}") from error
 
 
 def profile_to_dict(profile: Profile) -> dict[str, Any]:
@@ -79,12 +122,22 @@ def profile_to_dict(profile: Profile) -> dict[str, Any]:
     }
 
 
-def profile_from_dict(data: dict[str, Any], *, label: str = "el perfil") -> Profile:
+def profile_from_dict(data: Any, *, label: str = "el perfil") -> Profile:
     """Reconstruye un Profile desde un dict "crudo" (por ejemplo, un YAML recién leído).
 
     `label` deja que el llamador (típicamente `load_profile`) conserve el nombre del
     perfil en el mensaje de error, en vez de perderlo detrás de un genérico "el perfil".
+
+    Valida que `data` sea un mapeo por sí misma: es pública, y la API HTTP que la va a
+    usar directamente sobre un body JSON le puede pasar una lista, un string o `None`
+    (por ejemplo un `[1, 2]` como body) — sin este guard eso revienta con un
+    AttributeError crudo en el primer `.get()`, un 500 en vez de un 4xx.
     """
+    if not isinstance(data, dict):
+        raise ProfileCorrupt(
+            f"En {label}, el contenido no es un mapeo, sino {type(data).__name__}."
+        )
+
     raw_slots = data.get("slots", [])
     raw_sources = data.get("sources", [])
     if not isinstance(raw_slots, list) or not isinstance(raw_sources, list):
