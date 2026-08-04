@@ -15,6 +15,7 @@ from promptbrief.core.models import (
     Severity,
     Slot,
     SlotKind,
+    SourceFile,
     TaskType,
 )
 from promptbrief.core.profile.diff import ProfileDiff
@@ -83,6 +84,62 @@ class ProfileIn(BaseModel):
     def to_profile(self) -> Profile:
         """Levanta `ProfileCorrupt` si el contenido no tiene la forma esperada."""
         return profile_from_dict(self.model_dump(), label="el perfil recibido")
+
+
+class SourceOut(BaseModel):
+    path: str
+    sha256: str
+
+    @classmethod
+    def of(cls, source: SourceFile) -> SourceOut:
+        return cls(path=source.path, sha256=source.sha256)
+
+
+class ProfileOut(BaseModel):
+    """El perfil completo tal como sale por HTTP.
+
+    Espeja campo por campo lo que acepta `ProfileIn`: la pantalla de edición trae el
+    perfil por GET, lo modifica y lo manda de vuelta sin traducir nada en el medio.
+    Sigue siendo de un solo sentido —no sabe reconstruir un `Profile`—, así que el
+    inverso pasa igual por `profile_from_dict`, que es donde vive la validación.
+    """
+
+    name: str
+    root: str
+    budget_tokens: int
+    sources: list[SourceOut] = Field(default_factory=list)
+    slots: list[SlotOut] = Field(default_factory=list)
+
+    @classmethod
+    def of(cls, profile: Profile) -> ProfileOut:
+        return cls(
+            name=profile.name,
+            root=profile.root,
+            budget_tokens=profile.budget_tokens,
+            sources=[SourceOut.of(source) for source in profile.sources],
+            slots=[SlotOut.of(slot) for slot in profile.slots],
+        )
+
+
+class ProfileSummary(BaseModel):
+    """Lo mínimo para dibujar la lista de perfiles.
+
+    Los contadores viajan resueltos porque son lo único que la pantalla de lista
+    muestra además del nombre: devolver solo nombres la obligaría a pedir cada perfil
+    por separado para llenar una tabla.
+    """
+
+    name: str
+    slot_count: int
+    source_count: int
+
+    @classmethod
+    def of(cls, profile: Profile) -> ProfileSummary:
+        return cls(
+            name=profile.name,
+            slot_count=len(profile.slots),
+            source_count=len(profile.sources),
+        )
 
 
 class SelectionOut(BaseModel):

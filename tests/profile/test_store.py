@@ -2,7 +2,13 @@ import pytest
 
 from promptbrief.core.errors import InvalidProfileName, ProfileCorrupt, ProfileNotFound
 from promptbrief.core.models import Profile, Provenance, Slot, SlotKind, SourceFile, TaskType
-from promptbrief.core.profile.store import list_profiles, load_profile, profiles_dir, save_profile
+from promptbrief.core.profile.store import (
+    delete_profile,
+    list_profiles,
+    load_profile,
+    profiles_dir,
+    save_profile,
+)
 
 
 def sample() -> Profile:
@@ -96,6 +102,28 @@ def test_list_profiles_returns_sorted_names(tmp_path):
 def test_loading_a_missing_profile_raises_profile_not_found(tmp_path):
     with pytest.raises(ProfileNotFound):
         load_profile("nope", tmp_path)
+
+
+def test_delete_removes_the_profile_and_leaves_the_rest(tmp_path):
+    save_profile(sample(), tmp_path)
+    save_profile(Profile(name="alpha", root="/tmp/a", slots=(), sources=()), tmp_path)
+
+    delete_profile("demo", tmp_path)
+    assert list_profiles(tmp_path) == ["alpha"]
+
+
+def test_deleting_a_missing_profile_raises_profile_not_found(tmp_path):
+    with pytest.raises(ProfileNotFound):
+        delete_profile("nope", tmp_path)
+
+
+def test_deleting_with_a_dangerous_name_is_rejected(tmp_path):
+    victim = tmp_path.parent / "victima.yml"
+    victim.write_text("name: victima\nroot: /tmp/v\n", encoding="utf-8")
+
+    with pytest.raises(InvalidProfileName):
+        delete_profile("../victima", tmp_path)
+    assert victim.is_file()
 
 
 @pytest.mark.parametrize(

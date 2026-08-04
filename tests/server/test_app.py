@@ -1,19 +1,9 @@
-import pytest
 from fastapi.testclient import TestClient
 
 from promptbrief.core.errors import ProfileNotFound, StoredProfileCorrupt
-from promptbrief.server.app import create_app
-from promptbrief.server.security import TOKEN_HEADER, SecurityConfig
 
-CONFIG = SecurityConfig(token="t" * 40, port=8765)
-
-
-@pytest.fixture
-def api(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROMPTBRIEF_HOME", str(tmp_path / "home"))
-    client = TestClient(create_app(CONFIG, allowed_roots=(tmp_path,)))
-    client.headers.update({TOKEN_HEADER: CONFIG.token, "Host": "127.0.0.1:8765"})
-    return client
+# La fixture `api` vive en tests/server/conftest.py: la comparten los cuatro grupos de
+# endpoints, y una copia por archivo se desincronizaría con el contrato de create_app.
 
 
 def test_health_answers(api):

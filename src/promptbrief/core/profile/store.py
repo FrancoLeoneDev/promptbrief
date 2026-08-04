@@ -159,6 +159,23 @@ def _read_profile_text(path: Path) -> str:
             time.sleep(0.001)
 
 
+def delete_profile(name: str, directory: Path | None = None) -> None:
+    """Borra el perfil. Levanta ProfileNotFound si no estaba.
+
+    Vive acá y no en el llamador porque borrar necesita la misma resolución de nombre
+    que guardar y leer: reconstruir la ruta afuera duplicaría `_profile_path` y sería
+    la copia que se olvida de validar el nombre.
+
+    Intenta borrar y traduce el fallo en vez de preguntar si existe: entre el chequeo
+    y el `unlink` el archivo puede desaparecer, y ahí el chequeo no protege nada.
+    """
+    path = _profile_path(name, directory or profiles_dir())
+    try:
+        path.unlink()
+    except FileNotFoundError as error:
+        raise ProfileNotFound(f"No existe el perfil '{name}' en {path.parent}") from error
+
+
 def list_profiles(directory: Path | None = None) -> list[str]:
     """Nombres de los perfiles guardados, ordenados alfabéticamente."""
     target = directory or profiles_dir()
