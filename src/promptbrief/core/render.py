@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from textwrap import dedent
 from xml.sax.saxutils import escape, quoteattr
 
 from promptbrief.core.models import BriefRequest, Slot, SlotKind
@@ -45,7 +46,10 @@ def _section(tag: str, body: str) -> str:
 
 
 def _examples(examples: Sequence[str]) -> str:
-    clean = [text.strip() for text in examples if text.strip()]
+    # dedent antes del strip: sobre un bloque de código indentado, strip a secas se
+    # come la sangría de la primera línea nada más y distorsiona la relativa —
+    # "def f():" queda a 4 espacios y "return 1" a 12.
+    clean = [dedent(text).strip() for text in examples if text.strip()]
     if not clean:
         return ""
     blocks = [

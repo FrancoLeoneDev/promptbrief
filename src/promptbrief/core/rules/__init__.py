@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from promptbrief.core.rules.base import Rule, run_rules
 from promptbrief.core.rules.completeness import COMPLETENESS_RULES
 from promptbrief.core.rules.context import CONTEXT_RULES

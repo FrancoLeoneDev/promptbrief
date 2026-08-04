@@ -133,7 +133,14 @@ class OverEmphasis(Rule):
 
     def check(self, ctx: CheckContext) -> Finding | None:
         text = ctx.request.text
-        shouted = [word for word in _SHOUTED_WORD.findall(text) if word not in _KNOWN_ACRONYMS]
+        # Solo el conteo de gritos normaliza tildes, y sin bajar a minúscula: "ESTÁ"
+        # no matchea [A-Z]{4,} porque la tilde corta la palabra, pero minusculizar
+        # rompería la detección de mayúsculas entera.
+        shouted = [
+            word
+            for word in _SHOUTED_WORD.findall(strip_accents(text))
+            if word not in _KNOWN_ACRONYMS
+        ]
         if len(shouted) < _MIN_SHOUTED_WORDS and not _EMPHASIS_WORD.search(text):
             return None
         return self._finding(

@@ -123,6 +123,20 @@ def test_blank_examples_are_dropped_not_emitted_as_empty_tags():
     assert "first sample" in out and "second sample" in out
 
 
+def test_an_indented_code_example_keeps_its_relative_indentation():
+    request = BriefRequest(
+        text="write a post",
+        task_type=TaskType.WRITING,
+        examples=("    def f():\n        return 1",),
+    )
+    out = render_brief(request, [])
+    block = out[out.index("<example>") : out.index("</example>")]
+    body = [line for line in block.splitlines() if line.strip() and "<" not in line]
+    # Cuatro espacios los pone el renderer (nivel 2); la sangría del cuerpo del
+    # def es la del ejemplo, y tiene que seguir siendo de 4 respecto de su firma.
+    assert body == ["    def f():", "        return 1"]
+
+
 def test_all_blank_examples_omit_the_examples_section_entirely():
     request = BriefRequest(
         text="write a post",

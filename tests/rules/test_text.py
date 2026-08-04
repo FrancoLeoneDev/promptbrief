@@ -88,6 +88,13 @@ def test_over_emphasis_fires_on_shouted_word_count_alone():
     assert "over_emphasis" in text_findings("revisar el MODAL y el WIDGET de configuracion")
 
 
+def test_over_emphasis_counts_shouted_words_with_accents():
+    # Sin normalizar tildes, la Á corta la palabra y "ESTA" no llega a [A-Z]{4,}:
+    # solo contaba "TODO"... que además es una sigla conocida. Gritar en español
+    # no disparaba la regla.
+    assert "over_emphasis" in text_findings("ESTÁ TODO ROTO")
+
+
 def test_over_emphasis_silent_on_technical_acronyms():
     assert "over_emphasis" not in text_findings("actualizar README y CLAUDE.md con la convencion")
     assert "over_emphasis" not in text_findings("devolver JSON sobre HTTP usando REST")
