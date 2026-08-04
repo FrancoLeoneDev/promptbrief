@@ -89,6 +89,59 @@ def test_brief_prints_the_rendered_xml():
     assert "<success_criteria>" in result.stdout
 
 
+def test_a_distilled_profile_survives_the_round_trip_into_the_brief(tmp_path, monkeypatch):
+    """De un CLAUDE.md real al brief, pasando por el YAML: la afirmación central.
+
+    Los tests unitarios cubren cada tramo por separado; este es el único que
+    encadena destilar, guardar, cargar y renderizar como lo hace un usuario.
+    """
+    monkeypatch.setenv("PROMPTBRIEF_HOME", str(tmp_path / "home"))
+    project = tmp_path / "portfolio"
+    project.mkdir()
+    (project / "CLAUDE.md").write_text(
+        "# Portfolio\n"  # 1
+        "\n"  # 2
+        "## Convenciones\n"  # 3
+        "\n"  # 4
+        "- Los datos del proyecto viven en src/data/, no en los componentes\n"  # 5
+        "\n"  # 6
+        "## Prohibiciones\n"  # 7
+        "\n"  # 8
+        "- No usar librerías de routing fuera del App Router\n",  # 9
+        encoding="utf-8",
+    )
+
+    scan_result = runner.invoke(app, ["scan", str(project), "--name", "portfolio-demo"])
+    assert scan_result.exit_code == 0
+
+    result = runner.invoke(
+        app,
+        [
+            "brief", "Agregar una sección de proyectos de Python",
+            "--profile", "portfolio-demo",
+            "--success", "las cards renderizan como las de Game Dev",
+            "--format", "cambios de código con rutas",
+            "--file", "src/data/portfolio.ts",
+        ],
+    )
+    assert result.exit_code == 0
+
+    context = result.stdout[
+        result.stdout.index("<project_context>") : result.stdout.index("</project_context>")
+    ]
+    assert (
+        '<convention source="CLAUDE.md:5">Los datos del proyecto viven en src/data/, '
+        "no en los componentes</convention>"
+    ) in context
+
+    constraints = result.stdout[
+        result.stdout.index("<constraints>") : result.stdout.index("</constraints>")
+    ]
+    # La prohibición entra al brief reformulada en positivo (F3), no como estaba escrita.
+    assert "Resolver sin usar librerías de routing fuera del App Router" in constraints
+    assert "No usar" not in constraints
+
+
 def test_lint_with_a_profile_reaches_the_context_rules(tmp_path, monkeypatch):
     """Sin --profile, la familia C entera era inalcanzable desde lint."""
     monkeypatch.setenv("PROMPTBRIEF_HOME", str(tmp_path / "home"))
