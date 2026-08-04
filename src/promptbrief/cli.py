@@ -30,6 +30,10 @@ def _build_request(
     success: str | None,
     output_format: str | None,
     files: list[str],
+    repro: str | None = None,
+    expected: str | None = None,
+    constraints: list[str] | None = None,
+    examples: list[str] | None = None,
 ) -> BriefRequest:
     profile = None
     if profile_name:
@@ -44,6 +48,10 @@ def _build_request(
         success_criteria=success,
         output_format=output_format,
         file_scope=tuple(files),
+        constraints=tuple(constraints or ()),
+        examples=tuple(examples or ()),
+        repro_steps=repro,
+        expected_vs_actual=expected,
     )
 
 
@@ -105,12 +113,19 @@ def profiles() -> None:
 @app.command(name="lint")
 def lint_command(
     text: str,
-    success: str = typer.Option(None, "--success"),
-    output_format: str = typer.Option(None, "--format"),
-    file: list[str] = typer.Option([], "--file"),
+    profile: str = typer.Option(None, "--profile", help="Perfil del proyecto a inyectar"),
+    success: str = typer.Option(None, "--success", help="Cuándo la tarea está terminada"),
+    output_format: str = typer.Option(None, "--format", help="Qué forma tiene que tener la salida"),
+    file: list[str] = typer.Option([], "--file", help="Archivo en el alcance (repetible)"),
+    repro: str = typer.Option(None, "--repro", help="Pasos para reproducir el problema"),
+    expected: str = typer.Option(None, "--expected", help="Qué esperabas y qué pasa en realidad"),
+    constraint: list[str] = typer.Option([], "--constraint", help="Restricción (repetible)"),
+    example: list[str] = typer.Option([], "--example", help="Ejemplo de la salida (repetible)"),
 ) -> None:
     """Analiza un prompt sin generar el brief."""
-    request = _build_request(text, None, success, output_format, file)
+    request = _build_request(
+        text, profile, success, output_format, file, repro, expected, constraint, example
+    )
     try:
         findings = lint(request)
     except PromptBriefError as error:
@@ -126,13 +141,19 @@ def lint_command(
 @app.command()
 def brief(
     text: str,
-    profile: str = typer.Option(None, "--profile"),
-    success: str = typer.Option(None, "--success"),
-    output_format: str = typer.Option(None, "--format"),
-    file: list[str] = typer.Option([], "--file"),
+    profile: str = typer.Option(None, "--profile", help="Perfil del proyecto a inyectar"),
+    success: str = typer.Option(None, "--success", help="Cuándo la tarea está terminada"),
+    output_format: str = typer.Option(None, "--format", help="Qué forma tiene que tener la salida"),
+    file: list[str] = typer.Option([], "--file", help="Archivo en el alcance (repetible)"),
+    repro: str = typer.Option(None, "--repro", help="Pasos para reproducir el problema"),
+    expected: str = typer.Option(None, "--expected", help="Qué esperabas y qué pasa en realidad"),
+    constraint: list[str] = typer.Option([], "--constraint", help="Restricción (repetible)"),
+    example: list[str] = typer.Option([], "--example", help="Ejemplo de la salida (repetible)"),
 ) -> None:
     """Genera el brief y lo imprime."""
-    request = _build_request(text, profile, success, output_format, file)
+    request = _build_request(
+        text, profile, success, output_format, file, repro, expected, constraint, example
+    )
     try:
         result = build_brief(request)
     except PromptBriefError as error:
